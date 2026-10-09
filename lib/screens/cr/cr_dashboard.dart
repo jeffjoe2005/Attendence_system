@@ -18,16 +18,32 @@ class _CRDashboardState extends State<CRDashboard> {
     final auth = context.watch<AuthProvider>();
     final modData = context.watch<ModeratorDataProvider>();
 
-    if (_selectedCrEmail == null) {
-      if (auth.userEmail.isNotEmpty && modData.isCREmail(auth.userEmail)) {
-        _selectedCrEmail = auth.userEmail;
-      } else if (modData.crs.isNotEmpty) {
-        _selectedCrEmail = modData.crs.first['email'];
+    final crList = modData.crs;
+    final uniqueCrs = <Map<String, String>>[];
+    final seenEmails = <String>{};
+    for (final c in crList) {
+      final email = (c['email'] ?? '').trim().toLowerCase();
+      if (email.isNotEmpty && !seenEmails.contains(email)) {
+        seenEmails.add(email);
+        uniqueCrs.add({
+          ...c,
+          'email': email,
+        });
+      }
+    }
+
+    if (_selectedCrEmail == null || !seenEmails.contains(_selectedCrEmail?.toLowerCase())) {
+      if (auth.userEmail.isNotEmpty && seenEmails.contains(auth.userEmail.toLowerCase())) {
+        _selectedCrEmail = auth.userEmail.toLowerCase();
+      } else if (uniqueCrs.isNotEmpty) {
+        _selectedCrEmail = uniqueCrs.first['email'];
+      } else {
+        _selectedCrEmail = null;
       }
     }
 
     final activeEmail = _selectedCrEmail ?? '';
-    final crData = modData.crs.firstWhere(
+    final crData = uniqueCrs.firstWhere(
       (c) => c['email'] == activeEmail,
       orElse: () => {'email': activeEmail, 'name': 'CR', 'branch': 'ECE', 'semester': 'IV Sem'},
     );
@@ -112,11 +128,13 @@ class _CRDashboardState extends State<CRDashboard> {
                 Expanded(
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
-                      value: _selectedCrEmail,
+                      value: (uniqueCrs.any((c) => c['email'] == _selectedCrEmail))
+                          ? _selectedCrEmail
+                          : (uniqueCrs.isNotEmpty ? uniqueCrs.first['email'] : null),
                       isDense: true,
                       isExpanded: true,
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
-                      items: modData.crs.map((c) {
+                      items: uniqueCrs.map((c) {
                         final email = c['email'] ?? '';
                         final name = c['name'] ?? email;
                         final br = c['branch'] ?? '';
@@ -240,8 +258,9 @@ class _CRDashboardState extends State<CRDashboard> {
                 final roll = student['roll'] ?? '';
                 final sName = student['name'] ?? '';
                 final stats = modData.getStudentAttendanceStats(roll);
-                final pct = (stats['percentage'] as double).toStringAsFixed(0);
-                final isWarning = (stats['percentage'] as double) < 75.0;
+                final pctNum = (stats['percentage'] as num?)?.toDouble() ?? 85.0;
+                final pct = pctNum.toStringAsFixed(0);
+                final isWarning = pctNum < 75.0;
 
                 return ListTile(
                   dense: true,

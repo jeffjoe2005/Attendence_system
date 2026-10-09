@@ -1,4 +1,7 @@
+import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../providers/auth_provider.dart';
@@ -21,9 +24,9 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
   final TextEditingController _courseCodeCtrl = TextEditingController();
 
   String _selectedBranch = 'ECE';
-  String _selectedSemester = 'IV Sem';
+  String _selectedSemester = 'VI Sem';
   String _crBranch = 'ECE';
-  String _crSemester = 'IV Sem';
+  String _crSemester = 'VI Sem';
   String _importBranchTarget = 'Auto-detect';
 
   // Live extracted name previews
@@ -33,7 +36,7 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
   // Spreadsheet Search, Filter, Sort
   final TextEditingController _searchCtrl = TextEditingController();
   String _searchQuery = '';
-  String _branchFilter = 'All'; // 'All', 'CSE', 'ECE', 'EEE', 'ME', 'CE'
+  String _branchFilter = 'All'; // 'All', 'CSE', 'ECE', 'EEE', 'MCE', 'CVE'
   String _semFilter = 'All'; // 'All', 'IV Sem', 'VI Sem', 'VIII Sem', 'M.Tech'
   String _statusFilter = 'All'; // 'All', 'Assigned', 'Unassigned'
   ModColumnSort _sortColumn = ModColumnSort.branch;
@@ -46,6 +49,7 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
   void initState() {
     super.initState();
     _profEmailCtrl.addListener(() {
+      if (!mounted) return;
       final email = _profEmailCtrl.text.trim();
       setState(() {
         _extractedProfName = email.isNotEmpty ? ModeratorDataProvider.extractNameFromEmail(email) : '';
@@ -53,25 +57,15 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
     });
 
     _crEmailCtrl.addListener(() {
+      if (!mounted) return;
       final email = _crEmailCtrl.text.trim();
       setState(() {
         _extractedCrName = email.isNotEmpty ? ModeratorDataProvider.extractNameFromEmail(email) : '';
       });
     });
 
-    _courseCodeCtrl.addListener(() {
-      final code = _courseCodeCtrl.text.trim();
-      if (code.isNotEmpty) {
-        final derived = ModeratorDataProvider.deriveBranch(code);
-        if (derived != 'General' && derived != _selectedBranch) {
-          setState(() {
-            _selectedBranch = derived;
-          });
-        }
-      }
-    });
-
     _searchCtrl.addListener(() {
+      if (!mounted) return;
       setState(() {
         _searchQuery = _searchCtrl.text.trim().toLowerCase();
       });
@@ -189,16 +183,21 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
   // ── File Picker: Pick and import .xlsx / .csv from computer ──
   Future<void> _pickAndImportFile(BuildContext context, ModeratorDataProvider data) async {
     try {
-      final file = await FilePicker.pickFile(
+      final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['xlsx', 'xls', 'csv', 'tsv', 'txt'],
+        withData: true,
       );
 
-      if (file == null) return;
+      if (result == null || result.files.isEmpty) return;
+      final file = result.files.first;
       final ext = file.extension?.toLowerCase() ?? '';
-      final bytes = await file.readAsBytes();
+      List<int>? bytes = file.bytes;
+      if (bytes == null && file.path != null) {
+        bytes = await File(file.path!).readAsBytes();
+      }
 
-      if (bytes.isEmpty) {
+      if (bytes == null || bytes.isEmpty) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Could not read file data or file is empty.')),
@@ -210,9 +209,9 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
       final branchArg = _importBranchTarget == 'Auto-detect' ? null : _importBranchTarget;
       Map<String, int> res;
       if (ext == 'xlsx' || ext == 'xls') {
-        res = data.importExcelBytes(bytes, defaultBranch: branchArg);
+        res = data.importExcelBytes(bytes, defaultBranch: branchArg, fileName: file.name);
       } else {
-        final content = String.fromCharCodes(bytes);
+        final content = utf8.decode(bytes, allowMalformed: true);
         res = data.importCsvData(content, defaultBranch: branchArg);
       }
 
@@ -334,8 +333,8 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
                         DropdownMenuItem(value: 'CSE', child: Text('CSE - Computer Science')),
                         DropdownMenuItem(value: 'ECE', child: Text('ECE - Electronics & Comm')),
                         DropdownMenuItem(value: 'EEE', child: Text('EEE - Electrical & Electronics')),
-                        DropdownMenuItem(value: 'ME', child: Text('ME - Mechanical Engg')),
-                        DropdownMenuItem(value: 'CE', child: Text('CE - Civil Engg')),
+                        DropdownMenuItem(value: 'MCE', child: Text('MCE - Mechanical Engg')),
+                        DropdownMenuItem(value: 'CVE', child: Text('CVE - Civil Engg')),
                         DropdownMenuItem(value: 'General', child: Text('General / Interdisciplinary')),
                       ],
                       onChanged: (v) {
@@ -422,8 +421,10 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
         return const Color(0xFF2563EB); // Blue
       case 'EEE':
         return const Color(0xFFD97706); // Amber
+      case 'MCE':
       case 'ME':
         return const Color(0xFF059669); // Emerald / Green
+      case 'CVE':
       case 'CE':
         return const Color(0xFFEA580C); // Orange / Rust
       default:
@@ -439,8 +440,10 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
         return const Color(0xFFEFF6FF);
       case 'EEE':
         return const Color(0xFFFEF3C7);
+      case 'MCE':
       case 'ME':
         return const Color(0xFFECFDF5);
+      case 'CVE':
       case 'CE':
         return const Color(0xFFFFF7ED);
       default:
@@ -554,11 +557,13 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
                   children: [
                     _buildTopOptionTab(0, '1. Add Professor ($totalProfs)', Icons.person_add_alt_1_rounded),
                     const SizedBox(width: 6),
-                    _buildTopOptionTab(1, '2. Import Excel / CSV', Icons.table_view_rounded),
+                    _buildTopOptionTab(1, '2. Import Excel/CSV', Icons.table_view_rounded),
                     const SizedBox(width: 6),
                     _buildTopOptionTab(2, '3. Add CR ($totalCrs)', Icons.badge_outlined),
                     const SizedBox(width: 6),
-                    _buildTopOptionTab(3, '+ Add Course', Icons.add_circle_outline),
+                    _buildTopOptionTab(3, '+ Course', Icons.add_circle_outline),
+                    const SizedBox(width: 6),
+                    _buildTopOptionTab(4, 'Storage & Backup', Icons.save_rounded),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -568,6 +573,7 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
                 if (_activeTopAction == 1) _buildCsvImportCard(data),
                 if (_activeTopAction == 2) _buildAddCrCard(data),
                 if (_activeTopAction == 3) _buildAddCourseCard(data),
+                if (_activeTopAction == 4) _buildBackupStorageCard(data),
               ],
             ),
           ),
@@ -591,8 +597,8 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
                       _buildBranchFilterPill('CSE', 'CSE (${data.courses.where((c) => c['branch'] == 'CSE').length})'),
                       _buildBranchFilterPill('ECE', 'ECE (${data.courses.where((c) => c['branch'] == 'ECE').length})'),
                       _buildBranchFilterPill('EEE', 'EEE (${data.courses.where((c) => c['branch'] == 'EEE').length})'),
-                      _buildBranchFilterPill('ME', 'ME (${data.courses.where((c) => c['branch'] == 'ME').length})'),
-                      _buildBranchFilterPill('CE', 'CE (${data.courses.where((c) => c['branch'] == 'CE').length})'),
+                      _buildBranchFilterPill('MCE', 'MCE (${data.courses.where((c) => c['branch'] == 'MCE').length})'),
+                      _buildBranchFilterPill('CVE', 'CVE (${data.courses.where((c) => c['branch'] == 'CVE').length})'),
                     ],
                   ),
                 ),
@@ -855,8 +861,8 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
                       DropdownMenuItem(value: 'ECE', child: Text('ECE Dept')),
                       DropdownMenuItem(value: 'CSE', child: Text('CSE Dept')),
                       DropdownMenuItem(value: 'EEE', child: Text('EEE Dept')),
-                      DropdownMenuItem(value: 'ME', child: Text('ME Dept')),
-                      DropdownMenuItem(value: 'CE', child: Text('CE Dept')),
+                      DropdownMenuItem(value: 'MCE', child: Text('MCE Dept')),
+                      DropdownMenuItem(value: 'CVE', child: Text('CVE Dept')),
                     ],
                     onChanged: (v) {
                       if (v != null) setState(() => _selectedBranch = v);
@@ -940,12 +946,12 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
                     isDense: true,
                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
                     items: const [
-                      DropdownMenuItem(value: 'Auto-detect', child: Text('Branch: Auto-detect')),
-                      DropdownMenuItem(value: 'CSE', child: Text('Branch: CSE')),
+                      DropdownMenuItem(value: 'Auto-detect', child: Text('Branch: Auto-detect (Smart)')),
                       DropdownMenuItem(value: 'ECE', child: Text('Branch: ECE')),
+                      DropdownMenuItem(value: 'CSE', child: Text('Branch: CSE')),
                       DropdownMenuItem(value: 'EEE', child: Text('Branch: EEE')),
-                      DropdownMenuItem(value: 'ME', child: Text('Branch: ME')),
-                      DropdownMenuItem(value: 'CE', child: Text('Branch: CE')),
+                      DropdownMenuItem(value: 'MCE', child: Text('Branch: MCE')),
+                      DropdownMenuItem(value: 'CVE', child: Text('Branch: CVE')),
                     ],
                     onChanged: (v) {
                       if (v != null) setState(() => _importBranchTarget = v);
@@ -1047,8 +1053,8 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
                       DropdownMenuItem(value: 'ECE', child: Text('ECE')),
                       DropdownMenuItem(value: 'CSE', child: Text('CSE')),
                       DropdownMenuItem(value: 'EEE', child: Text('EEE')),
-                      DropdownMenuItem(value: 'ME', child: Text('ME')),
-                      DropdownMenuItem(value: 'CE', child: Text('CE')),
+                      DropdownMenuItem(value: 'MCE', child: Text('MCE')),
+                      DropdownMenuItem(value: 'CVE', child: Text('CVE')),
                     ],
                     onChanged: (v) {
                       if (v != null) setState(() => _crBranch = v);
@@ -1088,14 +1094,19 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
               ElevatedButton.icon(
                 onPressed: () {
                   final email = _crEmailCtrl.text.trim();
-                  if (email.isNotEmpty) {
-                    data.addCR(email, branch: _crBranch, semester: _crSemester);
-                    final name = ModeratorDataProvider.extractNameFromEmail(email);
-                    _crEmailCtrl.clear();
+                  if (email.isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Added CR: $name ($email) for $_crBranch $_crSemester')),
+                      const SnackBar(content: Text('Please enter a valid CR email.')),
                     );
+                    return;
                   }
+                  data.addCR(email, branch: _crBranch, semester: _crSemester);
+                  final name = ModeratorDataProvider.extractNameFromEmail(email);
+                  _crEmailCtrl.clear();
+                  setState(() => _extractedCrName = '');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Added CR: $name ($email) for $_crBranch $_crSemester')),
+                  );
                 },
                 icon: const Icon(Icons.add, size: 16),
                 label: const Text('Add CR'),
@@ -1119,6 +1130,78 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
                   style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFD97706)),
                 ),
               ],
+            ),
+          ],
+          if (data.crs.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            const Divider(height: 1, color: Color(0xFFE2E8F0)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.people_alt_outlined, size: 14, color: Color(0xFF64748B)),
+                const SizedBox(width: 6),
+                Text(
+                  'Active Class Representatives (${data.crs.length}):',
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF64748B)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: data.crs.map((cr) {
+                  final cEmail = cr['email'] ?? '';
+                  final cName = cr['name'] ?? cEmail;
+                  final cBranch = cr['branch'] ?? '';
+                  final cSem = cr['semester'] ?? '';
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFD97706).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              '$cBranch $cSem',
+                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFFD97706)),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '$cName ($cEmail)',
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                          ),
+                          const SizedBox(width: 4),
+                          InkWell(
+                            onTap: () {
+                              data.removeCR(cEmail);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Removed CR $cName ($cEmail)')),
+                              );
+                            },
+                            child: const Padding(
+                              padding: EdgeInsets.all(2.0),
+                              child: Icon(Icons.close_rounded, size: 14, color: Color(0xFFEF4444)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
             ),
           ],
         ],
@@ -1173,8 +1256,8 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
                   DropdownMenuItem(value: 'CSE', child: Text('CSE')),
                   DropdownMenuItem(value: 'ECE', child: Text('ECE')),
                   DropdownMenuItem(value: 'EEE', child: Text('EEE')),
-                  DropdownMenuItem(value: 'ME', child: Text('ME')),
-                  DropdownMenuItem(value: 'CE', child: Text('CE')),
+                  DropdownMenuItem(value: 'MCE', child: Text('MCE')),
+                  DropdownMenuItem(value: 'CVE', child: Text('CVE')),
                   DropdownMenuItem(value: 'General', child: Text('General')),
                 ],
                 onChanged: (v) {
@@ -1232,6 +1315,289 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
               minimumSize: const Size(0, 40),
             ),
             child: const Text('Add Course'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Top Card 5: Local Storage & Backup Management ──
+  Widget _buildBackupStorageCard(ModeratorDataProvider data) {
+    final coursesCount = data.courses.length;
+    final profsCount = data.professors.length;
+    final crsCount = data.crs.length;
+    final sessionsCount = data.attendanceSessions.length;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDCFCE7),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFF86EFAC)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.check_circle_rounded, size: 14, color: Color(0xFF16A34A)),
+                    SizedBox(width: 5),
+                    Text(
+                      'Auto-Save Active (Local JSON DB)',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF15803D)),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '$coursesCount Courses  •  $profsCount Professors  •  $crsCount CRs  •  $sessionsCount Attendance Records',
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              ElevatedButton.icon(
+                onPressed: () => _showExportDialog(data),
+                icon: const Icon(Icons.download_rounded, size: 16),
+                label: const Text('Export JSON Backup'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0F172A),
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(0, 36),
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => _showImportDialog(data),
+                icon: const Icon(Icons.upload_rounded, size: 16),
+                label: const Text('Import JSON Backup'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF0F172A),
+                  side: const BorderSide(color: Color(0xFFCBD5E1)),
+                  minimumSize: const Size(0, 36),
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  await data.saveToStorage();
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('All data successfully flushed to disk (nit_goa_attendance_data.json)!')),
+                  );
+                },
+                icon: const Icon(Icons.save_rounded, size: 16, color: Color(0xFF2563EB)),
+                label: const Text('Force Save Now', style: TextStyle(color: Color(0xFF2563EB))),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFF93C5FD)),
+                  minimumSize: const Size(0, 36),
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => _confirmResetDefaults(data),
+                icon: const Icon(Icons.restart_alt_rounded, size: 16, color: Color(0xFFDC2626)),
+                label: const Text('Reset to Default Seed Data', style: TextStyle(color: Color(0xFFDC2626))),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFFFCA5A5)),
+                  minimumSize: const Size(0, 36),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showExportDialog(ModeratorDataProvider data) {
+    final jsonStr = data.exportJsonString();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.download_rounded, color: Color(0xFF0F172A), size: 22),
+            SizedBox(width: 8),
+            Text('Export Attendance Data (JSON)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          ],
+        ),
+        content: SizedBox(
+          width: 580,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Complete backup snapshot of courses, faculty, CRs, and attendance sessions:',
+                style: TextStyle(fontSize: 12, color: Color(0xFF475569)),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                height: 240,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F172A),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: SingleChildScrollView(
+                  child: SelectableText(
+                    jsonStr,
+                    style: const TextStyle(fontFamily: 'monospace', fontSize: 11, color: Color(0xFF38BDF8)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+          ElevatedButton.icon(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: jsonStr));
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('JSON backup copied to clipboard!')),
+              );
+            },
+            icon: const Icon(Icons.copy_rounded, size: 16),
+            label: const Text('Copy to Clipboard'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0F172A),
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showImportDialog(ModeratorDataProvider data) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlgState) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.upload_rounded, color: Color(0xFF0F172A), size: 22),
+              SizedBox(width: 8),
+              Text('Import JSON Backup', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            ],
+          ),
+          content: SizedBox(
+            width: 580,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Paste previously exported JSON data to restore courses, assignments, and sessions:',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF475569)),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    TextButton.icon(
+                      onPressed: () async {
+                        final clip = await Clipboard.getData(Clipboard.kTextPlain);
+                        if (clip?.text != null) {
+                          setDlgState(() {
+                            controller.text = clip!.text!;
+                          });
+                        }
+                      },
+                      icon: const Icon(Icons.paste_rounded, size: 14),
+                      label: const Text('Paste from Clipboard', style: TextStyle(fontSize: 11)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: controller,
+                  maxLines: 10,
+                  style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
+                  decoration: InputDecoration(
+                    hintText: '{\n  "courses": [...],\n  "mappings": {...}\n}',
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () async {
+                final text = controller.text.trim();
+                if (text.isEmpty) return;
+                final ok = await data.importJsonString(text);
+                if (ctx.mounted) Navigator.pop(ctx);
+                if (!mounted) return;
+                if (ok) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Attendance database restored successfully!')),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Failed to parse JSON. Please check file format.'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0F172A),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Import & Restore'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _confirmResetDefaults(ModeratorDataProvider data) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Reset to Default Seed Data?'),
+        content: const Text(
+          'This will clear local storage and reload the standard semester data for CSE, ECE, EEE, ME, and CE.',
+          style: TextStyle(fontSize: 13),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              await data.restoreDefaults();
+              if (ctx.mounted) Navigator.pop(ctx);
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Restored standard 5-branch seed data and saved to disk!')),
+              );
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+            child: const Text('Reset to Defaults', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),

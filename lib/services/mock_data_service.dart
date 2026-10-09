@@ -248,8 +248,8 @@ class MockDataService {
       b('b1', 'ECE', 'Electronics and Communication Engineering'),
       b('b2', 'CSE', 'Computer Science and Engineering'),
       b('b3', 'EEE', 'Electrical and Electronics Engineering'),
-      b('b4', 'ME', 'Mechanical Engineering'),
-      b('b5', 'CE', 'Civil Engineering'),
+      b('b4', 'MCE', 'Mechanical Engineering'),
+      b('b5', 'CVE', 'Civil Engineering'),
     ];
   }
 
@@ -263,15 +263,34 @@ class MockDataService {
           profileCompleted: done, createdAt: t, updatedAt: t,
         );
     return [
+      // ── System roles ──
       u('mod1', 'moderator@nitgoa.ac.in', 'Dr. Rajesh Kumar', '', '', 0, 0, 'moderator'),
-      u('admin1', 'admin@nitgoa.ac.in', 'Prof. Meera Sharma', '', 'ECE', 0, 0, 'admin'),
-      u('prof1', 'prof.dsp@nitgoa.ac.in', 'Dr. Anil Verma', '', 'ECE', 0, 0, 'professor'),
-      u('prof2', 'prof.es@nitgoa.ac.in', 'Dr. Priya Nair', '', 'ECE', 0, 0, 'professor'),
-      u('cr1', 'cr.ece3@nitgoa.ac.in', 'Rahul Patil', '22ECE001', 'ECE', 3, 5, 'cr'),
-      u('stu1', 'student1@nitgoa.ac.in', 'Arjun Desai', '22ECE045', 'ECE', 3, 5, 'student'),
-      u('stu2', 'student2@nitgoa.ac.in', 'Sneha Iyer', '22ECE032', 'ECE', 3, 5, 'student'),
-      u('stu3', 'student3@nitgoa.ac.in', 'Karan Mehta', '22ECE018', 'ECE', 3, 5, 'student'),
-      u('stu4', 'student4@nitgoa.ac.in', 'Neha Kulkarni', '22ECE050', 'ECE', 3, 5, 'student'),
+      u('admin1', 'admin@nitgoa.ac.in', 'Dr. Shivnarayan Patidar', '', 'ECE', 0, 0, 'admin'),
+
+      // ── Professors (from ECE Even Sem 2026 schedule) ──
+      u('prof_nvk', 'najiya.vk@nitgoa.ac.in', 'Dr. Najiya V K', '', 'ECE', 0, 0, 'professor'),
+      u('prof_lkb', 'lokesh.kumar@nitgoa.ac.in', 'Dr. Lokesh Kumar B', '', 'ECE', 0, 0, 'professor'),
+      u('prof_pp', 'pragati.patel@nitgoa.ac.in', 'Dr. Pragati Patel', '', 'ECE', 0, 0, 'professor'),
+      u('prof_em', 'e.mallikarjun@nitgoa.ac.in', 'Dr. E. Mallikarjun', '', 'ECE', 0, 0, 'professor'),
+      u('prof_lig', 'lalat.giri@nitgoa.ac.in', 'Dr. Lalat Indu Giri', '', 'ECE', 0, 0, 'professor'),
+      u('prof_tp', 'trilochan.panigrahi@nitgoa.ac.in', 'Dr. Trilochan Panigrahi', '', 'ECE', 0, 0, 'professor'),
+      u('prof_abc', 'anirban.chatterjee@nitgoa.ac.in', 'Dr. Anirban Chatterjee', '', 'ECE', 0, 0, 'professor'),
+      u('prof_nyb', 'nithin.kumar@nitgoa.ac.in', 'Dr. Nithin Kumar Y.B.', '', 'ECE', 0, 0, 'professor'),
+      u('prof_tvk', 't.veerakumar@nitgoa.ac.in', 'Dr. T. Veerakumar', '', 'ECE', 0, 0, 'professor'),
+      u('prof_sk', 'sunil.kumar@nitgoa.ac.in', 'Dr. Sunil Kumar A', '', 'ECE', 0, 0, 'professor'),
+      u('prof_vk', 'velavan.k@nitgoa.ac.in', 'Dr. Velavan K', '', 'ECE', 0, 0, 'professor'),
+      u('prof_vmh', 'vasantha.mh@nitgoa.ac.in', 'Dr. Vasantha M.H', '', 'ECE', 0, 0, 'professor'),
+      u('prof_pgr', 'prashanth.gr@nitgoa.ac.in', 'Dr. Prashanth G.R', '', 'ECE', 0, 0, 'professor'),
+      u('prof_sgm', 'sarani.ghosal@nitgoa.ac.in', 'Dr. Sarani Ghosal Mondal', '', 'ECE', 0, 0, 'professor'),
+      u('prof_rk', 'rinu.koshy@nitgoa.ac.in', 'Dr. Rinu Koshy', '', 'ECE', 0, 0, 'professor'),
+      u('prof_cse', 'cse.faculty@nitgoa.ac.in', 'CSE Faculty', '', 'CSE', 0, 0, 'professor'),
+
+      // ── Students (ECE 3rd year, Sem 6 – even semester) ──
+      u('cr1', 'cr.ece3@nitgoa.ac.in', 'Rahul Patil', '22ECE001', 'ECE', 3, 6, 'cr'),
+      u('stu1', 'student1@nitgoa.ac.in', 'Arjun Desai', '22ECE045', 'ECE', 3, 6, 'student'),
+      u('stu2', 'student2@nitgoa.ac.in', 'Sneha Iyer', '22ECE032', 'ECE', 3, 6, 'student'),
+      u('stu3', 'student3@nitgoa.ac.in', 'Karan Mehta', '22ECE018', 'ECE', 3, 6, 'student'),
+      u('stu4', 'student4@nitgoa.ac.in', 'Neha Kulkarni', '22ECE050', 'ECE', 3, 6, 'student'),
       u('stu_new', 'newstudent@nitgoa.ac.in', '', '', '', 1, 1, 'student', done: false),
     ];
   }
@@ -287,11 +306,102 @@ class MockDataService {
           createdBy: 'mod1', createdAt: t, updatedAt: t,
         );
     return [
-      c('c1', 'ECE301', 'Digital Signal Processing', 'ECE', 3, 5, profUid: 'prof1', profName: 'Dr. Anil Verma'),
-      c('c2', 'ECE302', 'Embedded Systems', 'ECE', 3, 5, profUid: 'prof2', profName: 'Dr. Priya Nair'),
-      c('c3', 'ECE303', 'VLSI Design', 'ECE', 3, 5, profUid: 'prof1', profName: 'Dr. Anil Verma'),
-      c('c4', 'CSE301', 'Operating Systems', 'CSE', 3, 5),
-      c('c5', 'GEN101', 'Engineering Mathematics I', 'ECE', 1, 1, section: 'A'),
+      // ════════════════════════════════════════════════════════════
+      // BTech IV Semester (Even Sem 2026)
+      // ════════════════════════════════════════════════════════════
+      c('c_ec250', 'EC250', 'Numerical Methods for ECE', 'ECE', 2, 4,
+          profUid: 'prof_nvk', profName: 'Dr. Najiya V K'),
+      c('c_ec251', 'EC251', 'Analog Electronics', 'ECE', 2, 4,
+          profUid: 'prof_lkb', profName: 'Dr. Lokesh Kumar B'),
+      c('c_ec252', 'EC252', 'Principle of Communication Systems', 'ECE', 2, 4,
+          profUid: 'prof_pp', profName: 'Dr. Pragati Patel'),
+      c('c_ec253', 'EC253', 'Sensor Technologies', 'ECE', 2, 4,
+          profUid: 'prof_em', profName: 'Dr. E. Mallikarjun'),
+      c('c_ec254', 'EC254', 'Semiconductor Devices', 'ECE', 2, 4,
+          profUid: 'prof_lig', profName: 'Dr. Lalat Indu Giri'),
+      c('c_ie250', 'IE250', 'Innovation & Entrepreneurship', 'ECE', 2, 4),
+      c('c_ec255', 'EC255', 'Analog Electronics Laboratory', 'ECE', 2, 4,
+          profUid: 'prof_lkb', profName: 'Dr. Lokesh Kumar B'),
+      c('c_ec256', 'EC256', 'Communication Systems Laboratory', 'ECE', 2, 4,
+          profUid: 'prof_pp', profName: 'Dr. Pragati Patel'),
+
+      // ════════════════════════════════════════════════════════════
+      // BTech VI Semester (Even Sem 2026)
+      // ════════════════════════════════════════════════════════════
+      c('c_hs350', 'HS350', 'Industrial Economics', 'ECE', 3, 6,
+          profUid: 'prof_sk', profName: 'Dr. Sunil Kumar A'),
+      c('c_es300', 'ES300', 'Environmental Studies', 'ECE', 3, 6,
+          profUid: 'prof_vk', profName: 'Dr. Velavan K'),
+      c('c_ec350', 'EC350', 'Digital Communication', 'ECE', 3, 6,
+          profUid: 'prof_tp', profName: 'Dr. Trilochan Panigrahi'),
+      c('c_ec351', 'EC351', 'Principles of Antenna and Measurements', 'ECE', 3, 6,
+          profUid: 'prof_abc', profName: 'Dr. Anirban Chatterjee'),
+      c('c_ec352', 'EC352', 'VLSI Circuit Design', 'ECE', 3, 6,
+          profUid: 'prof_nyb', profName: 'Dr. Nithin Kumar Y.B.'),
+      c('c_ec520', 'EC520', 'Digital System Design Using FPGA (Elective)', 'ECE', 3, 6,
+          profUid: 'prof_tvk', profName: 'Dr. T. Veerakumar'),
+      c('c_cs901', 'CS901', 'Object Oriented Programming (Open Elective)', 'ECE', 3, 6,
+          profUid: 'prof_cse', profName: 'CSE Faculty'),
+      c('c_ec350m', 'EC350M', 'Fundamentals of Communication System (Minor)', 'ECE', 3, 6,
+          profUid: 'prof_abc', profName: 'Dr. Anirban Chatterjee'),
+      c('c_ec353', 'EC353', 'Digital Communication Laboratory', 'ECE', 3, 6,
+          profUid: 'prof_tp', profName: 'Dr. Trilochan Panigrahi'),
+      c('c_ec354', 'EC354', 'High Frequency Laboratory', 'ECE', 3, 6,
+          profUid: 'prof_pp', profName: 'Dr. Pragati Patel & Dr. E. Mallikarjun'),
+      c('c_ec355', 'EC355', 'VLSI Circuit Design Laboratory', 'ECE', 3, 6,
+          profUid: 'prof_nyb', profName: 'Dr. Nithin Kumar Y.B.'),
+      c('c_ec356', 'EC356', 'Seminar', 'ECE', 3, 6,
+          profUid: 'prof_lig', profName: 'Dr. Lalat Indu Giri'),
+
+      // ════════════════════════════════════════════════════════════
+      // BTech VIII Semester (Even Sem 2026)
+      // ════════════════════════════════════════════════════════════
+      c('c_hu401', 'HU401', 'Professional Communication-II and Language Lab', 'ECE', 4, 8,
+          profUid: 'prof_sgm', profName: 'Dr. Sarani Ghosal Mondal'),
+      c('c_ec405', 'EC405', 'Digital System Design', 'ECE', 4, 8,
+          profUid: 'prof_vmh', profName: 'Dr. Vasantha M.H'),
+      c('c_ec424', 'EC424', 'Low-Power VLSI Circuit Design', 'ECE', 4, 8,
+          profUid: 'prof_vmh', profName: 'Dr. Vasantha M.H'),
+      c('c_ec404', 'EC404', 'Electronic Instrumentation', 'ECE', 4, 8,
+          profUid: 'prof_em', profName: 'Dr. E. Mallikarjun'),
+      c('c_cs522', 'CS522', 'Artificial Intelligence', 'ECE', 4, 8,
+          profUid: 'prof_tp', profName: 'Dr. Trilochan Panigrahi'),
+      c('c_ec499', 'EC499', 'Major Project', 'ECE', 4, 8,
+          profUid: 'prof_tp', profName: 'Dr. Trilochan Panigrahi'),
+      c('c_ec450m', 'EC450M', 'Practical Applications of Microcontrollers (Minor)', 'ECE', 4, 8,
+          profUid: 'prof_pgr', profName: 'Dr. Prashanth G.R'),
+
+      // ════════════════════════════════════════════════════════════
+      // MTech II Semester (Even Sem 2026)
+      // ════════════════════════════════════════════════════════════
+      c('c_ec650', 'EC650', 'VLSI Testing and Testability', 'ECE', 1, 2,
+          profUid: 'prof_lkb', profName: 'Dr. Lokesh Kumar B'),
+      c('c_ec651', 'EC651', 'VLSI Technology', 'ECE', 1, 2,
+          profUid: 'prof_lig', profName: 'Dr. Lalat Indu Giri'),
+      c('c_ec802', 'EC802', 'Digital Design using FPGA', 'ECE', 1, 2,
+          profUid: 'prof_tvk', profName: 'Dr. T. Veerakumar'),
+      c('c_ec810', 'EC810', 'Low Power VLSI Design', 'ECE', 1, 2,
+          profUid: 'prof_vmh', profName: 'Dr. Vasantha M.H'),
+      c('c_ec804', 'EC804', 'Mixed Signal Design', 'ECE', 1, 2,
+          profUid: 'prof_nyb', profName: 'Dr. Nithin Kumar Y.B.'),
+      c('c_ec652', 'EC652', 'System Design Laboratory', 'ECE', 1, 2,
+          profUid: 'prof_vmh', profName: 'Dr. Vasantha M.H'),
+      c('c_ec653', 'EC653', 'VIVA-VOCE', 'ECE', 1, 2,
+          profUid: 'prof_em', profName: 'Dr. E. Mallikarjun'),
+      c('c_hu650', 'HU650', 'Communication Skills and Technical Writing', 'ECE', 1, 2,
+          profUid: 'prof_rk', profName: 'Dr. Rinu Koshy'),
+
+      // ════════════════════════════════════════════════════════════
+      // MTech IV Semester (Even Sem 2026)
+      // ════════════════════════════════════════════════════════════
+      c('c_ec750', 'EC750', 'Major Project - II', 'ECE', 2, 4,
+          profUid: 'prof_lig', profName: 'Dr. Lalat Indu Giri'),
+
+      // ════════════════════════════════════════════════════════════
+      // Open Elective
+      // ════════════════════════════════════════════════════════════
+      c('c_ec903', 'EC903', 'Introduction to Signal Processing', 'ECE', 0, 0,
+          profUid: 'prof_tvk', profName: 'Dr. T. Veerakumar'),
     ];
   }
 
@@ -304,12 +414,14 @@ class MockDataService {
           enrolledAt: t, approvedBy: by,
         );
     return [
-      e('c1', 'Digital Signal Processing', 'stu1', 'Arjun Desai', '22ECE045', 'prof1'),
-      e('c1', 'Digital Signal Processing', 'stu2', 'Sneha Iyer', '22ECE032', 'prof1'),
-      e('c1', 'Digital Signal Processing', 'stu3', 'Karan Mehta', '22ECE018', 'cr1'),
-      e('c1', 'Digital Signal Processing', 'cr1', 'Rahul Patil', '22ECE001', 'prof1'),
-      e('c2', 'Embedded Systems', 'stu1', 'Arjun Desai', '22ECE045', 'prof2'),
-      e('c2', 'Embedded Systems', 'cr1', 'Rahul Patil', '22ECE001', 'prof2'),
+      // VI Sem students enrolled in Digital Communication (c_ec350)
+      e('c_ec350', 'Digital Communication', 'stu1', 'Arjun Desai', '22ECE045', 'prof_tp'),
+      e('c_ec350', 'Digital Communication', 'stu2', 'Sneha Iyer', '22ECE032', 'prof_tp'),
+      e('c_ec350', 'Digital Communication', 'stu3', 'Karan Mehta', '22ECE018', 'cr1'),
+      e('c_ec350', 'Digital Communication', 'cr1', 'Rahul Patil', '22ECE001', 'prof_tp'),
+      // VI Sem students enrolled in VLSI Circuit Design (c_ec352)
+      e('c_ec352', 'VLSI Circuit Design', 'stu1', 'Arjun Desai', '22ECE045', 'prof_nyb'),
+      e('c_ec352', 'VLSI Circuit Design', 'cr1', 'Rahul Patil', '22ECE001', 'prof_nyb'),
     ];
   }
 
@@ -319,18 +431,18 @@ class MockDataService {
         EnrollmentRequestModel(
           id: '${courseId}_$uid', courseId: courseId, courseName: name, courseCode: code,
           userUid: uid, studentName: sName, rollNumber: roll,
-          branch: 'ECE', year: 3, semester: 5, status: 'pending', requestedAt: t,
+          branch: 'ECE', year: 3, semester: 6, status: 'pending', requestedAt: t,
         );
     return [
-      r('c1', 'ECE301', 'Digital Signal Processing', 'stu4', 'Neha Kulkarni', '22ECE050'),
-      r('c2', 'ECE302', 'Embedded Systems', 'stu2', 'Sneha Iyer', '22ECE032'),
-      r('c2', 'ECE302', 'Embedded Systems', 'stu3', 'Karan Mehta', '22ECE018'),
+      r('c_ec350', 'EC350', 'Digital Communication', 'stu4', 'Neha Kulkarni', '22ECE050'),
+      r('c_ec352', 'EC352', 'VLSI Circuit Design', 'stu2', 'Sneha Iyer', '22ECE032'),
+      r('c_ec352', 'EC352', 'VLSI Circuit Design', 'stu3', 'Karan Mehta', '22ECE018'),
     ];
   }
 
   /// Generates a realistic history:
-  /// - DSP (c1): 12 lectures. Arjun 83%, Sneha 75%, Karan 50% (defaulter), Rahul 92%
-  /// - Embedded (c2): 8 lectures. Arjun 62.5% (low in this subject), Rahul 87.5%
+  /// - Digital Communication (c_ec350): 12 lectures. Arjun 83%, Sneha 75%, Karan 50% (defaulter), Rahul 92%
+  /// - VLSI Circuit Design (c_ec352): 8 lectures. Arjun 62.5% (low in this subject), Rahul 87.5%
   static List<AttendanceSessionModel> _seedSessions() {
     final sessions = <AttendanceSessionModel>[];
 
@@ -374,8 +486,8 @@ class MockDataService {
     }
 
     build(
-      courseId: 'c1', courseName: 'Digital Signal Processing', lectures: 12,
-      markerUid: 'prof1', markerName: 'Dr. Anil Verma',
+      courseId: 'c_ec350', courseName: 'Digital Communication', lectures: 12,
+      markerUid: 'prof_tp', markerName: 'Dr. Trilochan Panigrahi',
       students: [
         ('stu1', 'Arjun Desai', '22ECE045', {3, 7}),
         ('stu2', 'Sneha Iyer', '22ECE032', {2, 5, 9}),
@@ -384,8 +496,8 @@ class MockDataService {
       ],
     );
     build(
-      courseId: 'c2', courseName: 'Embedded Systems', lectures: 8,
-      markerUid: 'prof2', markerName: 'Dr. Priya Nair',
+      courseId: 'c_ec352', courseName: 'VLSI Circuit Design', lectures: 8,
+      markerUid: 'prof_nyb', markerName: 'Dr. Nithin Kumar Y.B.',
       students: [
         ('stu1', 'Arjun Desai', '22ECE045', {2, 5, 7}),
         ('cr1', 'Rahul Patil', '22ECE001', {6}),

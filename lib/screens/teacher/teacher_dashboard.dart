@@ -33,8 +33,7 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
 
     // Filter courses mapped to this professor
     final myCourses = modData.courses.where((c) {
-      final assigned = modData.getProfessorForCourse(c['code'] ?? '') ?? '';
-      return activeEmail.isNotEmpty && assigned.toLowerCase().contains(activeEmail.toLowerCase());
+      return modData.isCourseAssignedToProfessor(c['code'] ?? '', activeEmail);
     }).toList();
 
     return Scaffold(
@@ -634,8 +633,8 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
                       final s = sessions[i];
                       final date = s['date'] ?? '';
                       final lec = s['lectureNumber'] ?? 1;
-                      final presents = (s['presentRolls'] as List<String>? ?? []);
-                      final absents = (s['absentRolls'] as List<String>? ?? []);
+                      final presents = List<String>.from(s['presentRolls'] as Iterable? ?? []);
+                      final absents = List<String>.from(s['absentRolls'] as Iterable? ?? []);
                       final total = presents.length + absents.length;
                       final pct = total > 0 ? ((presents.length / total) * 100).toStringAsFixed(0) : '0';
 
@@ -715,8 +714,10 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
         return const Color(0xFF2563EB);
       case 'EEE':
         return const Color(0xFFD97706);
+      case 'MCE':
       case 'ME':
         return const Color(0xFF059669);
+      case 'CVE':
       case 'CE':
         return const Color(0xFFEA580C);
       default:
@@ -732,8 +733,10 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
         return const Color(0xFFEFF6FF);
       case 'EEE':
         return const Color(0xFFFEF3C7);
+      case 'MCE':
       case 'ME':
         return const Color(0xFFECFDF5);
+      case 'CVE':
       case 'CE':
         return const Color(0xFFFFF7ED);
       default:

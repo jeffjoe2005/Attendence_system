@@ -16,7 +16,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   // Search & Filter state
   final TextEditingController _searchCtrl = TextEditingController();
   String _searchQuery = '';
-  String _branchFilter = 'All'; // 'All', 'CSE', 'ECE', 'EEE', 'ME', 'CE'
+  String _branchFilter = 'All'; // 'All', 'CSE', 'ECE', 'EEE', 'MCE', 'CVE'
   String _filter = 'All'; // 'All', 'Unassigned', 'IV Sem', 'VI Sem', 'VIII Sem', 'M.Tech'
 
   // Sorting state
@@ -269,7 +269,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       onPressed: () {
                         if (_modalCourseCode != null && _modalProfEmail != null) {
                           final profName = data.getProfessorNameByEmail(_modalProfEmail!) ?? _modalProfEmail!;
-                          data.assignProfessor(_modalCourseCode!, '$profName ($_modalProfEmail)');
+                          data.assignProfessor(_modalCourseCode!, profName);
                           Navigator.pop(ctx);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
@@ -306,8 +306,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
         return const Color(0xFF2563EB);
       case 'EEE':
         return const Color(0xFFD97706);
+      case 'MCE':
       case 'ME':
         return const Color(0xFF059669);
+      case 'CVE':
       case 'CE':
         return const Color(0xFFEA580C);
       default:
@@ -323,8 +325,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
         return const Color(0xFFEFF6FF);
       case 'EEE':
         return const Color(0xFFFEF3C7);
+      case 'MCE':
       case 'ME':
         return const Color(0xFFECFDF5);
+      case 'CVE':
       case 'CE':
         return const Color(0xFFFFF7ED);
       default:
@@ -452,8 +456,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       _buildBranchFilterPill('CSE', 'CSE (${data.courses.where((c) => c['branch'] == 'CSE').length})'),
                       _buildBranchFilterPill('ECE', 'ECE (${data.courses.where((c) => c['branch'] == 'ECE').length})'),
                       _buildBranchFilterPill('EEE', 'EEE (${data.courses.where((c) => c['branch'] == 'EEE').length})'),
-                      _buildBranchFilterPill('ME', 'ME (${data.courses.where((c) => c['branch'] == 'ME').length})'),
-                      _buildBranchFilterPill('CE', 'CE (${data.courses.where((c) => c['branch'] == 'CE').length})'),
+                      _buildBranchFilterPill('MCE', 'MCE (${data.courses.where((c) => c['branch'] == 'MCE').length})'),
+                      _buildBranchFilterPill('CVE', 'CVE (${data.courses.where((c) => c['branch'] == 'CVE').length})'),
                     ],
                   ),
                 ),

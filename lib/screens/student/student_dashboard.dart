@@ -46,7 +46,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
 
     // Compute student stats
     final overallStats = modData.getStudentAttendanceStats(activeRoll);
-    final overallPct = overallStats['percentage'] as double;
+    final overallPct = (overallStats['percentage'] as num?)?.toDouble() ?? 85.0;
     final isShortAttendance = overallPct < 75.0;
 
     return Scaffold(
@@ -246,7 +246,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
             int totalInSubject = sessions.length;
 
             for (final s in sessions) {
-              final presents = (s['presentRolls'] as List<String>? ?? []);
+              final presents = List<String>.from(s['presentRolls'] as Iterable? ?? []);
               if (presents.contains(activeRoll)) {
                 attendedInSubject++;
               }
