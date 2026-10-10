@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/moderator_data_provider.dart';
+import '../moderator/moderator_dashboard.dart';
 
 enum ColumnSort { slNo, code, name, branch, semester, type, professor }
 
@@ -18,6 +19,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
   String _searchQuery = '';
   String _branchFilter = 'All'; // 'All', 'CSE', 'ECE', 'EEE', 'MCE', 'CVE'
   String _filter = 'All'; // 'All', 'Unassigned', 'IV Sem', 'VI Sem', 'VIII Sem', 'M.Tech'
+
+  // Table Zoom scale (0.7x to 2.0x)
+  double _tableScale = 1.0;
 
   // Sorting state
   ColumnSort _sortColumn = ColumnSort.branch;
@@ -553,38 +557,147 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   BoxShadow(color: Color(0x06000000), blurRadius: 6, offset: Offset(0, 2)),
                 ],
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: courses.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.search_off_rounded, size: 36, color: Color(0xFF94A3B8)),
-                            const SizedBox(height: 8),
-                            const Text('No courses found', style: TextStyle(color: Color(0xFF64748B), fontSize: 13, fontWeight: FontWeight.w600)),
-                            const SizedBox(height: 8),
-                            ElevatedButton(
-                              onPressed: () {
-                                setState(() {
-                                  _branchFilter = 'All';
-                                  _filter = 'All';
-                                  _searchCtrl.clear();
-                                });
-                              },
-                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F172A), foregroundColor: Colors.white),
-                              child: const Text('Reset Filters'),
+              child: Column(
+                children: [
+                  // ── Table Zoom & View Options Toolbar ──
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
+                      border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.table_rows_rounded, size: 16, color: Color(0xFF334155)),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Courses (${courses.length})',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                        ),
+                        const Spacer(),
+                        // Inline Zoom Out Button
+                        Tooltip(
+                          message: 'Zoom Out Table',
+                          child: InkWell(
+                            onTap: _tableScale > 0.70
+                                ? () => setState(() => _tableScale = (_tableScale - 0.15).clamp(0.70, 2.0))
+                                : null,
+                            borderRadius: BorderRadius.circular(4),
+                            child: Padding(
+                              padding: const EdgeInsets.all(3),
+                              child: Icon(
+                                Icons.zoom_out_rounded,
+                                size: 18,
+                                color: _tableScale > 0.70 ? const Color(0xFF0F172A) : const Color(0xFFCBD5E1),
+                              ),
                             ),
-                          ],
+                          ),
                         ),
-                      )
-                    : SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.vertical,
-                          child: _buildSpreadsheetTable(context, data, courses),
+                        const SizedBox(width: 2),
+                        // Current Zoom Chip / Tap to Reset
+                        Tooltip(
+                          message: 'Current Zoom: ${(_tableScale * 100).round()}%. Tap to reset to 100%',
+                          child: InkWell(
+                            onTap: () => setState(() => _tableScale = 1.0),
+                            borderRadius: BorderRadius.circular(4),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: _tableScale != 1.0 ? const Color(0xFFEFF6FF) : const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
+                                  color: _tableScale != 1.0 ? const Color(0xFF3B82F6) : const Color(0xFFCBD5E1),
+                                ),
+                              ),
+                              child: Text(
+                                '${(_tableScale * 100).round()}%',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: _tableScale != 1.0 ? const Color(0xFF2563EB) : const Color(0xFF475569),
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 2),
+                        // Inline Zoom In Button
+                        Tooltip(
+                          message: 'Zoom In Table',
+                          child: InkWell(
+                            onTap: _tableScale < 2.0
+                                ? () => setState(() => _tableScale = (_tableScale + 0.15).clamp(0.70, 2.0))
+                                : null,
+                            borderRadius: BorderRadius.circular(4),
+                            child: Padding(
+                              padding: const EdgeInsets.all(3),
+                              child: Icon(
+                                Icons.zoom_in_rounded,
+                                size: 18,
+                                color: _tableScale < 2.0 ? const Color(0xFF0F172A) : const Color(0xFFCBD5E1),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        // Explicit Option: Fullscreen Zoom View
+                        ElevatedButton.icon(
+                          onPressed: () => _openFullscreenZoomTable(context, data, courses),
+                          icon: const Icon(Icons.fullscreen_rounded, size: 15),
+                          label: const Text('Zoom View', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0F172A),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            minimumSize: const Size(0, 28),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // ── Table Body ──
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8)),
+                      child: courses.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.search_off_rounded, size: 36, color: Color(0xFF94A3B8)),
+                                  const SizedBox(height: 8),
+                                  const Text('No courses found', style: TextStyle(color: Color(0xFF64748B), fontSize: 13, fontWeight: FontWeight.w600)),
+                                  const SizedBox(height: 8),
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      setState(() {
+                                        _branchFilter = 'All';
+                                        _filter = 'All';
+                                        _searchCtrl.clear();
+                                      });
+                                    },
+                                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F172A), foregroundColor: Colors.white),
+                                    child: const Text('Reset Filters'),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              physics: const BouncingScrollPhysics(),
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.vertical,
+                                physics: const BouncingScrollPhysics(),
+                                child: _buildSpreadsheetTable(context, data, courses, scale: _tableScale),
+                              ),
+                            ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -636,21 +749,44 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Widget _buildSpreadsheetTable(BuildContext context, ModeratorDataProvider data, List<Map<String, String>> courses) {
-    const double colWidthSl = 40.0;
-    const double colWidthCode = 88.0;
-    const double colWidthName = 230.0;
-    const double colWidthBranch = 75.0;
-    const double colWidthSem = 85.0;
-    const double colWidthType = 75.0;
-    const double colWidthProf = 240.0;
-    const double colWidthAction = 85.0;
+  // ══════════════════════════════════════════════════════════════
+  // OPEN FULLSCREEN ZOOM TABLE VIEWER
+  // ══════════════════════════════════════════════════════════════
+  void _openFullscreenZoomTable(BuildContext context, ModeratorDataProvider data, List<Map<String, String>> courses) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (ctx) => FullscreenTableZoomViewer(
+          data: data,
+          branchFilter: _branchFilter,
+          semFilter: _filter,
+          statusFilter: 'All',
+          searchQuery: _searchQuery,
+          tableBuilder: (buildCtx, scale) {
+            final freshData = buildCtx.watch<ModeratorDataProvider>();
+            final freshCourses = _getFilteredList(freshData);
+            return _buildSpreadsheetTable(buildCtx, freshData, freshCourses, scale: scale);
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSpreadsheetTable(BuildContext context, ModeratorDataProvider data, List<Map<String, String>> courses, {double scale = 1.0}) {
+    final double colWidthSl = (40.0 * scale);
+    final double colWidthCode = (88.0 * scale);
+    final double colWidthName = (230.0 * scale);
+    final double colWidthBranch = (75.0 * scale);
+    final double colWidthSem = (85.0 * scale);
+    final double colWidthType = (75.0 * scale);
+    final double colWidthProf = (240.0 * scale);
+    final double colWidthAction = (85.0 * scale);
 
     const borderColor = Color(0xFFCBD5E1);
 
     return Table(
       defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-      columnWidths: const {
+      columnWidths: {
         0: FixedColumnWidth(colWidthSl),
         1: FixedColumnWidth(colWidthCode),
         2: FixedColumnWidth(colWidthName),
@@ -666,19 +802,19 @@ class _AdminDashboardState extends State<AdminDashboard> {
         TableRow(
           decoration: const BoxDecoration(color: Color(0xFF0F172A)),
           children: [
-            _buildHeaderCell('#', ColumnSort.slNo, align: TextAlign.center),
-            _buildHeaderCell('Course Code', ColumnSort.code),
-            _buildHeaderCell('Course Name', ColumnSort.name),
-            _buildHeaderCell('Branch', ColumnSort.branch, align: TextAlign.center),
-            _buildHeaderCell('Semester', ColumnSort.semester, align: TextAlign.center),
-            _buildHeaderCell('Type', ColumnSort.type, align: TextAlign.center),
-            _buildHeaderCell('Course Coordinator / Professor', ColumnSort.professor),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 6, vertical: 12),
+            _buildHeaderCell('#', ColumnSort.slNo, align: TextAlign.center, scale: scale),
+            _buildHeaderCell('Course Code', ColumnSort.code, scale: scale),
+            _buildHeaderCell('Course Name', ColumnSort.name, scale: scale),
+            _buildHeaderCell('Branch', ColumnSort.branch, align: TextAlign.center, scale: scale),
+            _buildHeaderCell('Semester', ColumnSort.semester, align: TextAlign.center, scale: scale),
+            _buildHeaderCell('Type', ColumnSort.type, align: TextAlign.center, scale: scale),
+            _buildHeaderCell('Course Coordinator / Professor', ColumnSort.professor, scale: scale),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 6 * scale, vertical: 12 * scale),
               child: Text(
                 'Action',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 11),
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: (11 * scale).clamp(8.5, 20.0)),
               ),
             ),
           ],
@@ -710,36 +846,36 @@ class _AdminDashboardState extends State<AdminDashboard> {
             children: [
               // 0: Sl No
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
-                child: Text('$idx', textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                padding: EdgeInsets.symmetric(horizontal: 4 * scale, vertical: 10 * scale),
+                child: Text('$idx', textAlign: TextAlign.center, style: TextStyle(fontSize: (11 * scale).clamp(8.5, 20.0), color: const Color(0xFF64748B), fontWeight: FontWeight.w600)),
               ),
 
               // 1: Code
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-                child: Text(code, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+                padding: EdgeInsets.symmetric(horizontal: 8 * scale, vertical: 10 * scale),
+                child: Text(code, style: TextStyle(fontSize: (12 * scale).clamp(9.5, 22.0), fontWeight: FontWeight.w700, color: const Color(0xFF0F172A))),
               ),
 
               // 2: Name
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-                child: Text(name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)), maxLines: 2, overflow: TextOverflow.ellipsis),
+                padding: EdgeInsets.symmetric(horizontal: 8 * scale, vertical: 10 * scale),
+                child: Text(name, style: TextStyle(fontSize: (12 * scale).clamp(9.5, 22.0), fontWeight: FontWeight.w600, color: const Color(0xFF1E293B)), maxLines: 2, overflow: TextOverflow.ellipsis),
               ),
 
               // 3: Branch Badge
               Center(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                  padding: EdgeInsets.symmetric(horizontal: 4 * scale, vertical: 6 * scale),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: EdgeInsets.symmetric(horizontal: (6 * scale).clamp(3.0, 14.0), vertical: (2 * scale).clamp(1.0, 6.0)),
                     decoration: BoxDecoration(
                       color: _getBranchBgColor(branch),
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(4 * scale),
                       border: Border.all(color: _getBranchBadgeColor(branch).withValues(alpha: 0.3)),
                     ),
                     child: Text(
                       branch,
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: _getBranchBadgeColor(branch)),
+                      style: TextStyle(fontSize: (10 * scale).clamp(8.0, 18.0), fontWeight: FontWeight.w800, color: _getBranchBadgeColor(branch)),
                     ),
                   ),
                 ),
@@ -748,15 +884,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
               // 4: Semester
               Center(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                  padding: EdgeInsets.symmetric(horizontal: 4 * scale, vertical: 6 * scale),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: EdgeInsets.symmetric(horizontal: (6 * scale).clamp(3.0, 14.0), vertical: (2 * scale).clamp(1.0, 6.0)),
                     decoration: BoxDecoration(
                       color: _semBg(sem),
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(4 * scale),
                       border: Border.all(color: _semText(sem).withValues(alpha: 0.2)),
                     ),
-                    child: Text(sem, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _semText(sem))),
+                    child: Text(sem, style: TextStyle(fontSize: (10 * scale).clamp(8.0, 18.0), fontWeight: FontWeight.w700, color: _semText(sem))),
                   ),
                 ),
               ),
@@ -764,23 +900,23 @@ class _AdminDashboardState extends State<AdminDashboard> {
               // 5: Type
               Center(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
-                  child: Text(type, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, color: Color(0xFF475569))),
+                  padding: EdgeInsets.symmetric(horizontal: 4 * scale, vertical: 10 * scale),
+                  child: Text(type, textAlign: TextAlign.center, style: TextStyle(fontSize: (11 * scale).clamp(8.5, 20.0), color: const Color(0xFF475569))),
                 ),
               ),
 
               // 6: Professor
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                padding: EdgeInsets.symmetric(horizontal: 8 * scale, vertical: 8 * scale),
                 child: prof != null
-                    ? Text(prof, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)), overflow: TextOverflow.ellipsis)
-                    : const Text('⚠️ Not Assigned', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFFD97706))),
+                    ? Text(prof, style: TextStyle(fontSize: (11 * scale).clamp(8.5, 20.0), fontWeight: FontWeight.w600, color: const Color(0xFF0F172A)), overflow: TextOverflow.ellipsis)
+                    : Text('⚠️ Not Assigned', style: TextStyle(fontSize: (10 * scale).clamp(8.0, 18.0), fontWeight: FontWeight.w700, color: const Color(0xFFD97706))),
               ),
 
               // 7: Action (Assign / Change)
               Center(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                  padding: EdgeInsets.symmetric(horizontal: 4 * scale, vertical: 6 * scale),
                   child: prof != null
                       ? Row(
                           mainAxisSize: MainAxisSize.min,
@@ -789,12 +925,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
                               onTap: () => _openAssignDialog(context, data, defaultCourse: code),
                               borderRadius: BorderRadius.circular(4),
                               child: Container(
-                                padding: const EdgeInsets.all(4),
+                                padding: EdgeInsets.all((4 * scale).clamp(2.5, 10.0)),
                                 decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(4)),
-                                child: const Icon(Icons.edit_outlined, size: 14, color: Color(0xFF334155)),
+                                child: Icon(Icons.edit_outlined, size: (14 * scale).clamp(11.0, 24.0), color: const Color(0xFF334155)),
                               ),
                             ),
-                            const SizedBox(width: 4),
+                            SizedBox(width: (4 * scale).clamp(2.0, 8.0)),
                             InkWell(
                               onTap: () {
                                 data.removeAssignment(code);
@@ -804,25 +940,25 @@ class _AdminDashboardState extends State<AdminDashboard> {
                               },
                               borderRadius: BorderRadius.circular(4),
                               child: Container(
-                                padding: const EdgeInsets.all(4),
+                                padding: EdgeInsets.all((4 * scale).clamp(2.5, 10.0)),
                                 decoration: BoxDecoration(color: const Color(0xFFFEE2E2), borderRadius: BorderRadius.circular(4)),
-                                child: const Icon(Icons.link_off_rounded, size: 14, color: Color(0xFFDC2626)),
+                                child: Icon(Icons.link_off_rounded, size: (14 * scale).clamp(11.0, 24.0), color: const Color(0xFFDC2626)),
                               ),
                             ),
                           ],
                         )
                       : SizedBox(
-                          height: 28,
+                          height: (28 * scale).clamp(24.0, 48.0),
                           child: ElevatedButton(
                             onPressed: () => _openAssignDialog(context, data, defaultCourse: code),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF0F172A),
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              padding: EdgeInsets.symmetric(horizontal: (8 * scale).clamp(4.0, 16.0)),
                               elevation: 0,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                             ),
-                            child: const Text('Assign', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                            child: Text('Assign', style: TextStyle(fontSize: (11 * scale).clamp(8.5, 20.0), fontWeight: FontWeight.w700)),
                           ),
                         ),
                 ),
@@ -834,21 +970,21 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Widget _buildHeaderCell(String label, ColumnSort col, {TextAlign align = TextAlign.left}) {
+  Widget _buildHeaderCell(String label, ColumnSort col, {TextAlign align = TextAlign.left, double scale = 1.0}) {
     final isSelected = _sortColumn == col;
     final sortIcon = isSelected ? (_sortAsc ? ' ▲' : ' ▼') : '';
 
     return InkWell(
       onTap: () => _onHeaderTapped(col),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
+        padding: EdgeInsets.symmetric(horizontal: (6 * scale).clamp(3.0, 14.0), vertical: (12 * scale).clamp(6.0, 24.0)),
         child: Text(
           '$label$sortIcon',
           textAlign: align,
           style: TextStyle(
             color: isSelected ? const Color(0xFF38BDF8) : Colors.white,
             fontWeight: FontWeight.w700,
-            fontSize: 11,
+            fontSize: (11 * scale).clamp(8.5, 20.0),
           ),
         ),
       ),

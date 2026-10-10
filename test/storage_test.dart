@@ -3,8 +3,16 @@ import 'package:attendance_system/providers/moderator_data_provider.dart';
 import 'package:attendance_system/services/local_storage_service.dart';
 
 void main() {
+  setUp(() async {
+    await LocalStorageService.clearStorage();
+  });
+
+  tearDown(() async {
+    await LocalStorageService.clearStorage();
+  });
+
   test('Verify local storage saves and loads attendance system state', () async {
-    final provider = ModeratorDataProvider();
+    final provider = ModeratorDataProvider(seedDefaults: true);
     // Verify provider initializes with data
     expect(provider.courses.isNotEmpty, isTrue);
     expect(provider.professors.isNotEmpty, isTrue);

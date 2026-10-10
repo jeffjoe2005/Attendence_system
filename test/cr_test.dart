@@ -53,7 +53,7 @@ void main() {
   });
 
   testWidgets('Test CRDashboard with added CR', (tester) async {
-    final modData = ModeratorDataProvider();
+    final modData = ModeratorDataProvider(seedDefaults: true);
     final auth = AuthProvider();
     modData.addCR('new.cr@nitgoa.ac.in', branch: 'ECE', semester: 'VI Sem');
 

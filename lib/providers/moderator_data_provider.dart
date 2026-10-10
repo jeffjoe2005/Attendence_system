@@ -13,11 +13,15 @@ class ModeratorDataProvider extends ChangeNotifier {
   bool _isSeeding = false;
   Future<void>? _loadFuture;
 
-  ModeratorDataProvider() {
-    _isSeeding = true;
-    seedDefaultData();
-    _isSeeding = false;
-    _loadFuture = _performLoadFromStorage();
+  ModeratorDataProvider({bool seedDefaults = false, bool loadFromStorageOnStart = false}) {
+    if (seedDefaults) {
+      _isSeeding = true;
+      seedDefaultData();
+      _isSeeding = false;
+    }
+    if (loadFromStorageOnStart) {
+      _loadFuture = _performLoadFromStorage();
+    }
   }
 
   // ── Supported Branches (Official NIT Goa Acronyms) ──
@@ -1082,13 +1086,26 @@ class ModeratorDataProvider extends ChangeNotifier {
     }
   }
 
-  // ── Reset everything ──
+  // ── Reset everything (wipes out all data completely & deletes disk storage) ──
+  Future<void> resetEverything() async {
+    _courses.clear();
+    _professors.clear();
+    _crs.clear();
+    _mappings.clear();
+    _students.clear();
+    _attendanceSessions.clear();
+    await LocalStorageService.clearStorage();
+    notifyListeners();
+  }
+
   void resetSemester() {
     _courses.clear();
     _professors.clear();
     _crs.clear();
     _mappings.clear();
+    _students.clear();
     _attendanceSessions.clear();
+    LocalStorageService.clearStorage();
     notifyListeners();
   }
 
