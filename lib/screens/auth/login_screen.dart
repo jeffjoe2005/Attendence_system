@@ -171,9 +171,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 _roleButton(context, auth, 'Moderator', AppConstants.roleModerator,
                     const Color(0xFF7C3AED)),
                 const SizedBox(height: 10),
-                _roleButton(context, auth, 'Admin', AppConstants.roleAdmin,
-                    const Color(0xFF2563EB)),
-                const SizedBox(height: 10),
+                // Admin portal temporarily hidden from frontend; backend logic kept alive
+                // _roleButton(context, auth, 'Admin', AppConstants.roleAdmin,
+                //     const Color(0xFF2563EB)),
+                // const SizedBox(height: 10),
                 _roleButton(context, auth, 'Professor',
                     AppConstants.roleProfessor, const Color(0xFF059669)),
                 const SizedBox(height: 10),

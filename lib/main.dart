@@ -5,7 +5,7 @@ import 'providers/auth_provider.dart';
 import 'providers/moderator_data_provider.dart';
 import 'screens/student/student_dashboard.dart';
 import 'screens/teacher/teacher_dashboard.dart';
-import 'screens/hod/hod_dashboard.dart';
+// import 'screens/hod/hod_dashboard.dart'; // Kept intact: Admin portal backend & dashboard logic preserved
 import 'screens/moderator/moderator_dashboard.dart';
 import 'screens/cr/cr_dashboard.dart';
 
@@ -43,11 +43,11 @@ class PortalShell extends StatefulWidget {
 }
 
 class _PortalShellState extends State<PortalShell> {
-  int _currentIndex = 0; // 0: Moderator, 1: Admin, 2: Professor, 3: CR, 4: Student
+  int _currentIndex = 0; // 0: Moderator, 1: Professor, 2: CR, 3: Student
 
   final List<Widget> _portals = const [
     ModeratorDashboard(),
-    AdminDashboard(),
+    // AdminDashboard(), // Temporarily hidden from frontend; backend logic kept alive
     ProfessorDashboard(),
     CRDashboard(),
     StudentDashboard(),
@@ -79,11 +79,6 @@ class _PortalShellState extends State<PortalShell> {
               icon: Icon(Icons.shield_outlined, size: 20),
               activeIcon: Icon(Icons.shield_rounded, size: 20),
               label: 'Moderator',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.admin_panel_settings_outlined, size: 20),
-              activeIcon: Icon(Icons.admin_panel_settings_rounded, size: 20),
-              label: 'Admin',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.school_outlined, size: 20),

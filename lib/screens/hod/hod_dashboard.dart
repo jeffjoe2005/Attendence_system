@@ -144,8 +144,21 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   // Open modal bottom sheet to map professor to course
   void _openAssignDialog(BuildContext context, ModeratorDataProvider data, {String? defaultCourse}) {
-    _modalCourseCode = defaultCourse ?? (data.unassignedCourses.isNotEmpty ? data.unassignedCourses.first['code'] : data.courses.first['code']);
-    _modalProfEmail = data.professorEmails.isNotEmpty ? data.professorEmails.first : null;
+    _modalCourseCode = defaultCourse ?? (data.unassignedCourses.isNotEmpty ? data.unassignedCourses.first['code'] : (data.courses.isNotEmpty ? data.courses.first['code'] : ''));
+    
+    final targetCourse = data.courses.firstWhere(
+      (c) => c['code'] == _modalCourseCode,
+      orElse: () => {'code': '', 'name': '', 'branch': 'ECE'},
+    );
+    final targetBranch = targetCourse['branch'] ?? 'ECE';
+    final currentAssignedProf = data.getProfessorForCourse(_modalCourseCode ?? '');
+    final currentEmail = currentAssignedProf != null ? data.getProfessorEmailByName(currentAssignedProf) : null;
+
+    final deptMatch = data.professors.firstWhere(
+      (p) => (p['department'] ?? '').toUpperCase() == targetBranch.toUpperCase(),
+      orElse: () => {},
+    );
+    _modalProfEmail = currentEmail ?? (deptMatch.isNotEmpty ? deptMatch['email'] : (data.professorEmails.isNotEmpty ? data.professorEmails.first : null));
 
     showModalBottomSheet(
       context: context,
@@ -157,8 +170,19 @@ class _AdminDashboardState extends State<AdminDashboard> {
           builder: (ctx, setModalState) {
             final course = data.courses.firstWhere(
               (c) => c['code'] == _modalCourseCode,
-              orElse: () => {'code': '', 'name': ''},
+              orElse: () => {'code': '', 'name': '', 'branch': targetBranch},
             );
+            final courseBranch = course['branch'] ?? targetBranch;
+
+            // Sort professors: Matching department first, then alphabetical
+            final sortedProfessors = List<Map<String, String>>.from(data.professors)
+              ..sort((a, b) {
+                final aMatch = (a['department'] ?? '').toUpperCase() == courseBranch.toUpperCase();
+                final bMatch = (b['department'] ?? '').toUpperCase() == courseBranch.toUpperCase();
+                if (aMatch && !bMatch) return -1;
+                if (!aMatch && bMatch) return 1;
+                return (a['name'] ?? '').compareTo(b['name'] ?? '');
+              });
 
             return Padding(
               padding: EdgeInsets.only(
@@ -209,9 +233,19 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         ),
                         const SizedBox(width: 10),
                         Expanded(
-                          child: Text(
-                            course['name'] ?? '',
-                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF1E293B)),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                course['name'] ?? '',
+                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF1E293B)),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${course['branch'] ?? ''} • ${course['semester'] ?? ''}',
+                                style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -231,35 +265,58 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       border: Border.all(color: const Color(0xFFCBD5E1)),
                     ),
                     child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: _modalProfEmail,
-                        isExpanded: true,
-                        hint: const Text('Choose Professor'),
-                        items: data.professors.map((p) {
-                          final email = p['email'] ?? '';
-                          final name = p['name'] ?? email;
-                          final dept = p['department'] ?? '';
-                          return DropdownMenuItem(
-                            value: email,
-                            child: Row(
-                              children: [
-                                const Icon(Icons.person_outline, size: 16, color: Color(0xFF64748B)),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    '$name  ($email)${dept.isNotEmpty ? " • $dept" : ""}',
-                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
+                      child: () {
+                        final seenEmails = <String>{};
+                        final items = <DropdownMenuItem<String>>[];
+                        for (final p in sortedProfessors) {
+                          final email = (p['email'] ?? '').trim().toLowerCase();
+                          if (email.isNotEmpty && !seenEmails.contains(email)) {
+                            seenEmails.add(email);
+                            final name = p['name'] ?? email;
+                            final dept = p['department'] ?? '';
+                            final isDeptMatch = dept.toUpperCase() == courseBranch.toUpperCase();
+                            items.add(
+                              DropdownMenuItem(
+                                value: email,
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      isDeptMatch ? Icons.verified_user_outlined : Icons.person_outline,
+                                      size: 16,
+                                      color: isDeptMatch ? const Color(0xFF16A34A) : const Color(0xFF64748B),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        '$name${dept.isNotEmpty ? " • $dept" : ""}${isDeptMatch ? " (Recommended)" : ""}',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: isDeptMatch ? FontWeight.w700 : FontWeight.w500,
+                                          color: isDeptMatch ? const Color(0xFF0F172A) : const Color(0xFF475569),
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (val) {
-                          setModalState(() => _modalProfEmail = val);
-                        },
-                      ),
+                              ),
+                            );
+                          }
+                        }
+                        final currentVal = seenEmails.contains(_modalProfEmail?.toLowerCase())
+                            ? _modalProfEmail
+                            : (seenEmails.isNotEmpty ? seenEmails.first : null);
+
+                        return DropdownButton<String>(
+                          value: currentVal,
+                          isExpanded: true,
+                          hint: const Text('Choose Professor'),
+                          items: items,
+                          onChanged: (val) {
+                            setModalState(() => _modalProfEmail = val);
+                          },
+                        );
+                      }(),
                     ),
                   ),
 

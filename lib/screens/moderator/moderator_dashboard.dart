@@ -46,6 +46,19 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
   final TextEditingController _crEmailCtrl = TextEditingController();
   final TextEditingController _searchCtrl = TextEditingController();
 
+  // Course Form Controllers & State
+  final TextEditingController _courseCodeCtrl = TextEditingController();
+  final TextEditingController _courseNameCtrl = TextEditingController();
+  final TextEditingController _courseNewProfNameCtrl = TextEditingController();
+  final TextEditingController _courseNewProfEmailCtrl = TextEditingController();
+
+  String _courseBranch = 'ECE';
+  String _courseSemester = 'VI Sem';
+  String _courseType = 'Theory';
+  int _courseProfMode = 0; // 0: Old/Existing Professor, 1: New Professor
+  String _courseSelectedProf = '';
+  String _extractedCourseNewProfName = '';
+
   String _selectedProfDept = 'ECE';
   String _crBranch = 'ECE';
   String _crSemester = 'VI Sem';
@@ -63,7 +76,7 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
   ModColumnSort _sortColumn = ModColumnSort.code;
   bool _sortAsc = true;
 
-  // Active top tool: 0: Add Faculty, 1: Import CSV/Excel, 2: Add CR, 4: Storage & Backup
+  // Active top tool: 0: Add Faculty, 1: Courses, 2: Add CR, 3: Import CSV/Excel, 4: Storage & Backup
   int _activeTopAction = 0;
 
   // Table Density & Zoom
@@ -92,6 +105,17 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
       });
     });
 
+    _courseNewProfEmailCtrl.addListener(() {
+      if (!mounted) return;
+      final email = _courseNewProfEmailCtrl.text.trim();
+      setState(() {
+        _extractedCourseNewProfName = email.isNotEmpty ? ModeratorDataProvider.extractNameFromEmail(email) : '';
+        if (_extractedCourseNewProfName.isNotEmpty && _courseNewProfNameCtrl.text.isEmpty) {
+          _courseNewProfNameCtrl.text = 'Dr. $_extractedCourseNewProfName';
+        }
+      });
+    });
+
     _searchCtrl.addListener(() {
       if (!mounted) return;
       setState(() {
@@ -105,6 +129,10 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
     _profEmailCtrl.dispose();
     _crEmailCtrl.dispose();
     _searchCtrl.dispose();
+    _courseCodeCtrl.dispose();
+    _courseNameCtrl.dispose();
+    _courseNewProfNameCtrl.dispose();
+    _courseNewProfEmailCtrl.dispose();
     super.dispose();
   }
 
@@ -447,6 +475,60 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
     );
   }
 
+  // ── Safe, Deduplicated Professor Dropdown Items Builder ──
+  List<DropdownMenuItem<String>> _buildProfDropdownItems(
+    ModeratorDataProvider data, {
+    String? preferredBranch,
+    bool includeUnassigned = false,
+  }) {
+    final seen = <String>{};
+    final items = <DropdownMenuItem<String>>[];
+
+    if (includeUnassigned) {
+      items.add(
+        const DropdownMenuItem<String>(
+          value: '',
+          child: Text('Unassigned', style: TextStyle(color: mut, fontSize: 13)),
+        ),
+      );
+    }
+
+    final sorted = List<Map<String, String>>.from(data.professors);
+    if (preferredBranch != null && preferredBranch.isNotEmpty) {
+      sorted.sort((a, b) {
+        final aMatch = (a['department'] ?? '').toUpperCase() == preferredBranch.toUpperCase();
+        final bMatch = (b['department'] ?? '').toUpperCase() == preferredBranch.toUpperCase();
+        if (aMatch && !bMatch) return -1;
+        if (!aMatch && bMatch) return 1;
+        return (a['name'] ?? '').compareTo(b['name'] ?? '');
+      });
+    }
+
+    for (final p in sorted) {
+      final name = (p['name'] ?? '').trim();
+      if (name.isNotEmpty && !seen.contains(name)) {
+        seen.add(name);
+        final dept = p['department'] ?? '';
+        final isMatch = preferredBranch != null && dept.toUpperCase() == preferredBranch.toUpperCase();
+        items.add(
+          DropdownMenuItem<String>(
+            value: name,
+            child: Text(
+              '$name${dept.isNotEmpty ? " • $dept" : ""}${isMatch ? " (Recommended)" : ""}',
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: isMatch ? FontWeight.w700 : FontWeight.w400,
+              ),
+            ),
+          ),
+        );
+      }
+    }
+
+    return items;
+  }
+
   // ── Add / Edit Course Modal Dialog ──
   void _openCourseDialog(BuildContext context, ModeratorDataProvider data, {Map<String, String>? course}) {
     final isEditing = course != null;
@@ -456,6 +538,23 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
     String sem = course?['semester'] ?? (_semFilter != 'All' ? _semFilter : 'VI Sem');
     String type = course?['type'] ?? 'Theory';
     String prof = (course != null ? data.getProfessorForCourse(course['code'] ?? '') : null) ?? '';
+    int profMode = 0;
+    final newProfEmailCtrl = TextEditingController();
+    final newProfNameCtrl = TextEditingController();
+    String extractedNewName = '';
+
+    // Build crash-proof dynamic option lists containing current course values
+    final typeOptions = <String>{
+      'Theory', 'Lab', 'Practical', 'MLC', 'Elective', 'OE', 'Project', 'Viva', 'Seminar', 'Theory& Practical', 'Audit', type,
+    }.where((t) => t.isNotEmpty).toList();
+
+    final branchOptions = <String>{
+      'CSE', 'ECE', 'EEE', 'MCE', 'CVE', 'General', branch,
+    }.where((b) => b.isNotEmpty).toList();
+
+    final semOptions = <String>{
+      'I Sem', 'II Sem', 'III Sem', 'IV Sem', 'V Sem', 'VI Sem', 'VII Sem', 'VIII Sem', 'M.Tech', 'Open Elective', sem,
+    }.where((s) => s.isNotEmpty).toList();
 
     showDialog(
       context: context,
@@ -470,7 +569,8 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
               ),
               insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
               child: Container(
-                width: 440,
+                constraints: const BoxConstraints(maxWidth: 500),
+                width: 500,
                 padding: const EdgeInsets.all(20),
                 child: SingleChildScrollView(
                   child: Column(
@@ -520,9 +620,9 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
                                   ),
                                   child: DropdownButtonHideUnderline(
                                     child: DropdownButton<String>(
-                                      value: type,
+                                      value: typeOptions.contains(type) ? type : typeOptions.first,
                                       isExpanded: true,
-                                      items: ['Theory', 'Lab', 'MLC', 'Elective']
+                                      items: typeOptions
                                           .map((t) => DropdownMenuItem(value: t, child: Text(t, style: const TextStyle(fontSize: 13))))
                                           .toList(),
                                       onChanged: (val) {
@@ -574,9 +674,9 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
                                   ),
                                   child: DropdownButtonHideUnderline(
                                     child: DropdownButton<String>(
-                                      value: branch,
+                                      value: branchOptions.contains(branch) ? branch : branchOptions.first,
                                       isExpanded: true,
-                                      items: ModeratorDataProvider.supportedBranches
+                                      items: branchOptions
                                           .map((b) => DropdownMenuItem(value: b, child: Text(b, style: const TextStyle(fontSize: 13))))
                                           .toList(),
                                       onChanged: (val) {
@@ -604,9 +704,9 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
                                   ),
                                   child: DropdownButtonHideUnderline(
                                     child: DropdownButton<String>(
-                                      value: ['I Sem', 'II Sem', 'III Sem', 'IV Sem', 'V Sem', 'VI Sem', 'VII Sem', 'VIII Sem', 'M.Tech'].contains(sem) ? sem : 'VI Sem',
+                                      value: semOptions.contains(sem) ? sem : semOptions.first,
                                       isExpanded: true,
-                                      items: ['I Sem', 'II Sem', 'III Sem', 'IV Sem', 'V Sem', 'VI Sem', 'VII Sem', 'VIII Sem', 'M.Tech']
+                                      items: semOptions
                                           .map((s) => DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontSize: 13))))
                                           .toList(),
                                       onChanged: (val) {
@@ -621,33 +721,135 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      // Row 4: Assigned Professor
+                      // Row 4: Assigned Professor (Old or New)
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Assigned professor', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: mut)),
-                          const SizedBox(height: 4),
-                          Container(
-                            height: 42,
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(9),
-                              border: Border.all(color: line),
-                            ),
-                            child: DropdownButtonHideUnderline(
-                              child: DropdownButton<String>(
-                                value: prof.isEmpty ? '' : prof,
-                                isExpanded: true,
-                                items: [
-                                  const DropdownMenuItem(value: '', child: Text('Unassigned', style: TextStyle(fontSize: 13, color: mut))),
-                                  ...data.professors.map((p) => DropdownMenuItem(value: p['name'] ?? '', child: Text(p['name'] ?? '', style: const TextStyle(fontSize: 13)))),
-                                ],
-                                onChanged: (val) {
-                                  if (val != null) setDlgState(() => prof = val);
-                                },
+                          Wrap(
+                            alignment: WrapAlignment.spaceBetween,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 8,
+                            runSpacing: 6,
+                            children: [
+                              const Text('Assigned professor', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: mut)),
+                              Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: BoxDecoration(
+                                  color: soft,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: line),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    InkWell(
+                                      onTap: () => setDlgState(() => profMode = 0),
+                                      borderRadius: BorderRadius.circular(6),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: profMode == 0 ? ink : Colors.transparent,
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          'Old Professor',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: profMode == 0 ? FontWeight.w700 : FontWeight.w500,
+                                            color: profMode == 0 ? Colors.white : mut,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    InkWell(
+                                      onTap: () => setDlgState(() => profMode = 1),
+                                      borderRadius: BorderRadius.circular(6),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: profMode == 1 ? ink : Colors.transparent,
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          '+ New Professor',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: profMode == 1 ? FontWeight.w700 : FontWeight.w500,
+                                            color: profMode == 1 ? Colors.white : mut,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          if (profMode == 0) ...[
+                            Container(
+                              height: 42,
+                              padding: const EdgeInsets.symmetric(horizontal: 10),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(9),
+                                border: Border.all(color: line),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: () {
+                                  final profItems = _buildProfDropdownItems(data, preferredBranch: branch, includeUnassigned: true);
+                                  final currentProfVal = profItems.any((item) => item.value == prof) ? prof : '';
+                                  return DropdownButton<String>(
+                                    value: currentProfVal,
+                                    isExpanded: true,
+                                    items: profItems,
+                                    onChanged: (val) {
+                                      if (val != null) setDlgState(() => prof = val);
+                                    },
+                                  );
+                                }(),
                               ),
                             ),
-                          ),
+                          ] else ...[
+                            TextField(
+                              controller: newProfEmailCtrl,
+                              style: const TextStyle(fontSize: 13),
+                              keyboardType: TextInputType.emailAddress,
+                              onChanged: (val) {
+                                setDlgState(() {
+                                  extractedNewName = val.trim().isNotEmpty ? ModeratorDataProvider.extractNameFromEmail(val.trim()) : '';
+                                  if (extractedNewName.isNotEmpty && newProfNameCtrl.text.isEmpty) {
+                                    newProfNameCtrl.text = 'Dr. $extractedNewName';
+                                  }
+                                });
+                              },
+                              decoration: InputDecoration(
+                                hintText: 'New professor email (e.g. prof@nitgoa.ac.in)',
+                                hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(9), borderSide: const BorderSide(color: line)),
+                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(9), borderSide: const BorderSide(color: line)),
+                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(9), borderSide: const BorderSide(color: ink)),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: newProfNameCtrl,
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                              decoration: InputDecoration(
+                                hintText: 'New professor name (e.g. Dr. Full Name)',
+                                hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(9), borderSide: const BorderSide(color: line)),
+                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(9), borderSide: const BorderSide(color: line)),
+                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(9), borderSide: const BorderSide(color: ink)),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              ),
+                            ),
+                            if (extractedNewName.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text('Will be registered under $branch faculty', style: const TextStyle(fontSize: 11, color: blue, fontWeight: FontWeight.w600)),
+                            ],
+                          ],
                         ],
                       ),
                       const SizedBox(height: 20),
@@ -674,9 +876,25 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
                               final name = nameCtrl.text.trim();
                               if (code.isEmpty || name.isEmpty) return;
 
+                              if (profMode == 1) {
+                                final newEmail = newProfEmailCtrl.text.trim();
+                                var newName = newProfNameCtrl.text.trim();
+                                if (newEmail.isNotEmpty) {
+                                  if (newName.isEmpty) {
+                                    newName = 'Dr. ${ModeratorDataProvider.extractNameFromEmail(newEmail)}';
+                                  }
+                                  data.addProfessor(newEmail, name: newName, department: branch);
+                                  prof = newName;
+                                } else if (newName.isNotEmpty) {
+                                  final genEmail = '${newName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '.')}.temp@nitgoa.ac.in';
+                                  data.addProfessor(genEmail, name: newName, department: branch);
+                                  prof = newName;
+                                }
+                              }
+
                               if (isEditing) {
                                 data.updateCourse(
-                                  course['code']!,
+                                  course['code'] ?? '',
                                   newCode: code,
                                   newName: name,
                                   newBranch: branch,
@@ -877,8 +1095,6 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
     );
   }
 
-  void _confirmResetDefaults(ModeratorDataProvider data) => _confirmResetEverything(data);
-
   @override
   Widget build(BuildContext context) {
     final data = context.watch<ModeratorDataProvider>();
@@ -993,7 +1209,7 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
                     const SizedBox(width: 8),
                     _buildToolButton(
                       index: 1,
-                      label: 'Import Excel/CSV',
+                      label: 'Courses ($totalCourses)',
                       isActive: _activeTopAction == 1,
                     ),
                     const SizedBox(width: 8),
@@ -1005,9 +1221,8 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
                     const SizedBox(width: 8),
                     _buildToolButton(
                       index: 3,
-                      label: '+ Course',
-                      isActive: false,
-                      onTapDirect: () => _openCourseDialog(context, data),
+                      label: 'Import Excel/CSV',
+                      isActive: _activeTopAction == 3,
                     ),
                     const SizedBox(width: 8),
                     _buildToolButton(
@@ -1022,8 +1237,9 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
 
               // ── 2. Active Tool Form Card ──
               if (_activeTopAction == 0) _buildAddFacultyCard(data),
-              if (_activeTopAction == 1) _buildCsvImportCard(data),
+              if (_activeTopAction == 1) _buildAddCourseCard(data),
               if (_activeTopAction == 2) _buildAddCrCard(data),
+              if (_activeTopAction == 3) _buildCsvImportCard(data),
               if (_activeTopAction == 4) _buildBackupStorageCard(data),
 
               // ── 3. Branch Filter Tabs ──
@@ -1185,6 +1401,20 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
                             ],
                           ),
                         ),
+                        const SizedBox(width: 10),
+                        ElevatedButton.icon(
+                          onPressed: () => _openCourseDialog(context, data),
+                          icon: const Icon(Icons.add, size: 14),
+                          label: const Text('+ Course', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: ink,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                        ),
                         const Spacer(),
                         // Density Toggle
                         OutlinedButton(
@@ -1324,12 +1554,9 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
                               child: DropdownButtonHideUnderline(
                                 child: DropdownButton<String>(
                                   hint: const Text('Assign professor to selected…', style: TextStyle(fontSize: 12, color: ink, fontWeight: FontWeight.w500)),
-                                  items: data.professors.map((p) {
-                                    final name = p['name'] ?? '';
-                                    return DropdownMenuItem(value: name, child: Text(name, style: const TextStyle(fontSize: 12, color: ink)));
-                                  }).toList(),
+                                  items: _buildProfDropdownItems(data, includeUnassigned: false),
                                   onChanged: (prof) {
-                                    if (prof != null) _bulkAssign(prof, data);
+                                    if (prof != null && prof.isNotEmpty) _bulkAssign(prof, data);
                                   },
                                 ),
                               ),
@@ -1578,7 +1805,561 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
     );
   }
 
-  // ── Tool Card 1: Import Excel/CSV ──
+  void _submitAddCourse(ModeratorDataProvider data) {
+    final code = _courseCodeCtrl.text.trim().toUpperCase();
+    final name = _courseNameCtrl.text.trim();
+
+    if (code.isEmpty || name.isEmpty) {
+      _showToast('Please enter both course code and course name');
+      return;
+    }
+
+    String profToAssign = '';
+
+    if (_courseProfMode == 0) {
+      profToAssign = _courseSelectedProf.trim();
+    } else {
+      final newEmail = _courseNewProfEmailCtrl.text.trim();
+      var newName = _courseNewProfNameCtrl.text.trim();
+
+      if (newEmail.isNotEmpty || newName.isNotEmpty) {
+        if (newName.isEmpty && newEmail.isNotEmpty) {
+          newName = 'Dr. ${ModeratorDataProvider.extractNameFromEmail(newEmail)}';
+        }
+        final email = newEmail.isNotEmpty
+            ? newEmail
+            : '${newName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '.')}.temp@nitgoa.ac.in';
+
+        data.addProfessor(email, name: newName, department: _courseBranch);
+        profToAssign = newName;
+      }
+    }
+
+    data.addCourse(
+      name,
+      code,
+      branch: _courseBranch,
+      semester: _courseSemester,
+      type: _courseType,
+    );
+
+    if (profToAssign.isNotEmpty) {
+      data.assignProfessor(code, profToAssign);
+    }
+
+    _courseCodeCtrl.clear();
+    _courseNameCtrl.clear();
+    _courseNewProfEmailCtrl.clear();
+    _courseNewProfNameCtrl.clear();
+    setState(() {
+      _extractedCourseNewProfName = '';
+      _courseSelectedProf = '';
+    });
+
+    _showToast(
+      profToAssign.isNotEmpty
+          ? 'Course $code added & mapped to $profToAssign'
+          : 'Course $code added successfully',
+      onUndo: () {
+        data.removeCourse(code);
+        setState(() {});
+      },
+    );
+  }
+
+  // ── Tool Card 1: Courses Section ──
+  Widget _buildAddCourseCard(ModeratorDataProvider data) {
+    final profItems = _buildProfDropdownItems(data, preferredBranch: _courseBranch, includeUnassigned: true);
+    final currentProfVal = profItems.any((item) => item.value == _courseSelectedProf) ? _courseSelectedProf : '';
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: line),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: LayoutBuilder(
+        builder: (ctx, constraints) {
+          final isDesktop = constraints.maxWidth >= 720;
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header Row
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.menu_book_rounded, size: 18, color: ink),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Add Course & Assign Faculty',
+                        style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: ink),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: blueBg,
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        child: Text(
+                          '$_courseBranch • $_courseSemester',
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: blue),
+                        ),
+                      ),
+                    ],
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () => _openCourseDialog(context, data),
+                    icon: const Icon(Icons.open_in_new_rounded, size: 13),
+                    label: const Text('Open Modal', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: ink,
+                      side: const BorderSide(color: line),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Course Code & Name
+              if (isDesktop)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 150,
+                      child: TextField(
+                        controller: _courseCodeCtrl,
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                        textCapitalization: TextCapitalization.characters,
+                        decoration: InputDecoration(
+                          labelText: 'Course Code *',
+                          hintText: 'e.g. EC301',
+                          hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(9), borderSide: const BorderSide(color: line)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(9), borderSide: const BorderSide(color: line)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(9), borderSide: const BorderSide(color: ink)),
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      flex: 3,
+                      child: TextField(
+                        controller: _courseNameCtrl,
+                        style: const TextStyle(fontSize: 13),
+                        decoration: InputDecoration(
+                          labelText: 'Course Name *',
+                          hintText: 'e.g. Digital Signal Processing',
+                          hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(9), borderSide: const BorderSide(color: line)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(9), borderSide: const BorderSide(color: line)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(9), borderSide: const BorderSide(color: ink)),
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              else
+                Column(
+                  children: [
+                    TextField(
+                      controller: _courseCodeCtrl,
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                      textCapitalization: TextCapitalization.characters,
+                      decoration: InputDecoration(
+                        labelText: 'Course Code *',
+                        hintText: 'e.g. EC301',
+                        hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(9), borderSide: const BorderSide(color: line)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(9), borderSide: const BorderSide(color: line)),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(9), borderSide: const BorderSide(color: ink)),
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _courseNameCtrl,
+                      style: const TextStyle(fontSize: 13),
+                      decoration: InputDecoration(
+                        labelText: 'Course Name *',
+                        hintText: 'e.g. Digital Signal Processing',
+                        hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(9), borderSide: const BorderSide(color: line)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(9), borderSide: const BorderSide(color: line)),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(9), borderSide: const BorderSide(color: ink)),
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                    ),
+                  ],
+                ),
+              const SizedBox(height: 10),
+
+              // Branch, Semester, Type Selectors
+              Row(
+                children: [
+                  // Branch
+                  Expanded(
+                    child: Container(
+                      height: 42,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(9),
+                        border: Border.all(color: line),
+                        color: Colors.white,
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _courseBranch,
+                          isExpanded: true,
+                          style: const TextStyle(fontSize: 13, color: ink, fontWeight: FontWeight.w500),
+                          items: const [
+                            DropdownMenuItem(value: 'ECE', child: Text('ECE Branch')),
+                            DropdownMenuItem(value: 'CSE', child: Text('CSE Branch')),
+                            DropdownMenuItem(value: 'EEE', child: Text('EEE Branch')),
+                            DropdownMenuItem(value: 'MCE', child: Text('MCE Branch')),
+                            DropdownMenuItem(value: 'CVE', child: Text('CVE Branch')),
+                            DropdownMenuItem(value: 'General', child: Text('General')),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) setState(() => _courseBranch = val);
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Semester
+                  Expanded(
+                    child: Container(
+                      height: 42,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(9),
+                        border: Border.all(color: line),
+                        color: Colors.white,
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _courseSemester,
+                          isExpanded: true,
+                          style: const TextStyle(fontSize: 13, color: ink, fontWeight: FontWeight.w500),
+                          items: const [
+                            DropdownMenuItem(value: 'I Sem', child: Text('I Sem')),
+                            DropdownMenuItem(value: 'II Sem', child: Text('II Sem')),
+                            DropdownMenuItem(value: 'III Sem', child: Text('III Sem')),
+                            DropdownMenuItem(value: 'IV Sem', child: Text('IV Sem')),
+                            DropdownMenuItem(value: 'V Sem', child: Text('V Sem')),
+                            DropdownMenuItem(value: 'VI Sem', child: Text('VI Sem')),
+                            DropdownMenuItem(value: 'VII Sem', child: Text('VII Sem')),
+                            DropdownMenuItem(value: 'VIII Sem', child: Text('VIII Sem')),
+                            DropdownMenuItem(value: 'M.Tech', child: Text('M.Tech')),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) setState(() => _courseSemester = val);
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Type
+                  Expanded(
+                    child: Container(
+                      height: 42,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(9),
+                        border: Border.all(color: line),
+                        color: Colors.white,
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _courseType,
+                          isExpanded: true,
+                          style: const TextStyle(fontSize: 13, color: ink, fontWeight: FontWeight.w500),
+                          items: const [
+                            DropdownMenuItem(value: 'Theory', child: Text('Theory')),
+                            DropdownMenuItem(value: 'Lab', child: Text('Lab')),
+                            DropdownMenuItem(value: 'Practical', child: Text('Practical')),
+                            DropdownMenuItem(value: 'MLC', child: Text('MLC')),
+                            DropdownMenuItem(value: 'Elective', child: Text('Elective')),
+                            DropdownMenuItem(value: 'OE', child: Text('OE')),
+                            DropdownMenuItem(value: 'Project', child: Text('Project')),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) setState(() => _courseType = val);
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Professor Assignment Box
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: soft,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: line),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Assign Professor',
+                          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: ink),
+                        ),
+                        // Segmented Switch: Old Professor vs + New Professor
+                        Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: line),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              InkWell(
+                                onTap: () => setState(() => _courseProfMode = 0),
+                                borderRadius: BorderRadius.circular(6),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: _courseProfMode == 0 ? ink : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    'Old Professor',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: _courseProfMode == 0 ? FontWeight.w700 : FontWeight.w500,
+                                      color: _courseProfMode == 0 ? Colors.white : mut,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              InkWell(
+                                onTap: () => setState(() => _courseProfMode = 1),
+                                borderRadius: BorderRadius.circular(6),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: _courseProfMode == 1 ? ink : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    '+ New Professor',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: _courseProfMode == 1 ? FontWeight.w700 : FontWeight.w500,
+                                      color: _courseProfMode == 1 ? Colors.white : mut,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+
+                    if (_courseProfMode == 0) ...[
+                      // Old Professor Dropdown
+                      Container(
+                        height: 42,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(9),
+                          border: Border.all(color: line),
+                          color: Colors.white,
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: currentProfVal,
+                            isExpanded: true,
+                            items: profItems,
+                            onChanged: (val) {
+                              if (val != null) setState(() => _courseSelectedProf = val);
+                            },
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Select an existing professor from the college roster. Matching $_courseBranch faculty are highlighted with (Recommended).',
+                        style: const TextStyle(fontSize: 11, color: mut),
+                      ),
+                    ] else ...[
+                      // New Professor Input Fields
+                      if (isDesktop)
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              flex: 3,
+                              child: TextField(
+                                controller: _courseNewProfEmailCtrl,
+                                style: const TextStyle(fontSize: 13),
+                                keyboardType: TextInputType.emailAddress,
+                                decoration: InputDecoration(
+                                  labelText: 'New Professor Email *',
+                                  hintText: 'e.g. prof@nitgoa.ac.in',
+                                  hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(9), borderSide: const BorderSide(color: line)),
+                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(9), borderSide: const BorderSide(color: line)),
+                                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(9), borderSide: const BorderSide(color: ink)),
+                                  filled: true,
+                                  fillColor: Colors.white,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              flex: 3,
+                              child: TextField(
+                                controller: _courseNewProfNameCtrl,
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                decoration: InputDecoration(
+                                  labelText: 'New Professor Name',
+                                  hintText: 'e.g. Dr. Full Name',
+                                  hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(9), borderSide: const BorderSide(color: line)),
+                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(9), borderSide: const BorderSide(color: line)),
+                                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(9), borderSide: const BorderSide(color: ink)),
+                                  filled: true,
+                                  fillColor: Colors.white,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      else
+                        Column(
+                          children: [
+                            TextField(
+                              controller: _courseNewProfEmailCtrl,
+                              style: const TextStyle(fontSize: 13),
+                              keyboardType: TextInputType.emailAddress,
+                              decoration: InputDecoration(
+                                labelText: 'New Professor Email *',
+                                hintText: 'e.g. prof@nitgoa.ac.in',
+                                hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(9), borderSide: const BorderSide(color: line)),
+                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(9), borderSide: const BorderSide(color: line)),
+                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(9), borderSide: const BorderSide(color: ink)),
+                                filled: true,
+                                fillColor: Colors.white,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: _courseNewProfNameCtrl,
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                              decoration: InputDecoration(
+                                labelText: 'New Professor Name',
+                                hintText: 'e.g. Dr. Full Name',
+                                hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(9), borderSide: const BorderSide(color: line)),
+                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(9), borderSide: const BorderSide(color: line)),
+                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(9), borderSide: const BorderSide(color: ink)),
+                                filled: true,
+                                fillColor: Colors.white,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              ),
+                            ),
+                          ],
+                        ),
+                      const SizedBox(height: 6),
+                      Text(
+                        _extractedCourseNewProfName.isNotEmpty
+                            ? 'Will register Dr. $_extractedCourseNewProfName under $_courseBranch faculty and assign to this course.'
+                            : 'Enter email or name. The professor will be added to the faculty list under $_courseBranch and mapped.',
+                        style: const TextStyle(fontSize: 11, color: blue, fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Action Buttons Row
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  OutlinedButton(
+                    onPressed: () {
+                      _courseCodeCtrl.clear();
+                      _courseNameCtrl.clear();
+                      _courseNewProfEmailCtrl.clear();
+                      _courseNewProfNameCtrl.clear();
+                      setState(() {
+                        _extractedCourseNewProfName = '';
+                        _courseSelectedProf = '';
+                      });
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: ink,
+                      side: const BorderSide(color: line),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    ),
+                    child: const Text('Clear', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    onPressed: () => _submitAddCourse(data),
+                    icon: const Icon(Icons.check_rounded, size: 16),
+                    label: const Text('+ Add Course', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: ink,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+                      minimumSize: const Size(0, 42),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  // ── Tool Card 3: Import Excel/CSV ──
   Widget _buildCsvImportCard(ModeratorDataProvider data) {
     return Container(
       padding: const EdgeInsets.all(14),
@@ -1986,40 +2767,51 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
                 ),
               ),
 
-              // 2: Course Code
+              // 2: Course Code (Clickable)
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: 8.0 * scale, vertical: verticalPad),
-                child: Text(
-                  code,
-                  style: TextStyle(
-                    fontSize: (12.5 * scale).clamp(9.5, 22.0),
-                    fontWeight: FontWeight.w600,
-                    color: ink,
-                    fontFeatures: const [FontFeature.tabularFigures()],
+                child: InkWell(
+                  onTap: () => _openCourseDialog(context, data, course: c),
+                  borderRadius: BorderRadius.circular(4),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Text(
+                      code,
+                      style: TextStyle(
+                        fontSize: (12.5 * scale).clamp(9.5, 22.0),
+                        fontWeight: FontWeight.w700,
+                        color: ink,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
                   ),
                 ),
               ),
 
-              // 3: Course Name + Type Badge
+              // 3: Course Name + Type Badge (Clickable)
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: 8.0 * scale, vertical: verticalPad),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        name,
-                        style: TextStyle(
-                          fontSize: (12.5 * scale).clamp(9.5, 22.0),
-                          fontWeight: FontWeight.w500,
-                          color: ink,
+                child: InkWell(
+                  onTap: () => _openCourseDialog(context, data, course: c),
+                  borderRadius: BorderRadius.circular(4),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          name,
+                          style: TextStyle(
+                            fontSize: (12.5 * scale).clamp(9.5, 22.0),
+                            fontWeight: FontWeight.w500,
+                            color: ink,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    _buildTypeBadge(type, scale: scale),
-                  ],
+                      const SizedBox(width: 6),
+                      _buildTypeBadge(type, scale: scale),
+                    ],
+                  ),
                 ),
               ),
 
@@ -2065,32 +2857,30 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
                           SizedBox(width: 8 * scale),
                           Expanded(
                             child: DropdownButtonHideUnderline(
-                              child: DropdownButton<String>(
-                                value: data.professors.any((p) => p['name'] == prof) ? prof : null,
-                                isDense: true,
-                                isExpanded: true,
-                                style: TextStyle(
-                                  fontSize: (12.5 * scale).clamp(9.0, 20.0),
-                                  fontWeight: FontWeight.w500,
-                                  color: ink,
-                                ),
-                                items: [
-                                  const DropdownMenuItem(value: '', child: Text('Unassigned', style: TextStyle(color: mut))),
-                                  ...data.professors.map((p) => DropdownMenuItem(
-                                    value: p['name'] ?? '',
-                                    child: Text(p['name'] ?? '', overflow: TextOverflow.ellipsis),
-                                  )),
-                                ],
-                                onChanged: (newProf) {
-                                  if (newProf == null || newProf.isEmpty) {
-                                    data.removeAssignment(code);
-                                    _showToast('$code unassigned');
-                                  } else {
-                                    data.assignProfessor(code, newProf);
-                                    _showToast('$code → $newProf');
-                                  }
-                                },
-                              ),
+                              child: () {
+                                final profItems = _buildProfDropdownItems(data, preferredBranch: branch, includeUnassigned: true);
+                                final currentVal = profItems.any((item) => item.value == prof) ? prof : '';
+                                return DropdownButton<String>(
+                                  value: currentVal,
+                                  isDense: true,
+                                  isExpanded: true,
+                                  style: TextStyle(
+                                    fontSize: (12.5 * scale).clamp(9.0, 20.0),
+                                    fontWeight: FontWeight.w500,
+                                    color: ink,
+                                  ),
+                                  items: profItems,
+                                  onChanged: (newProf) {
+                                    if (newProf == null || newProf.isEmpty) {
+                                      data.removeAssignment(code);
+                                      _showToast('$code unassigned');
+                                    } else {
+                                      data.assignProfessor(code, newProf);
+                                      _showToast('$code → $newProf');
+                                    }
+                                  },
+                                );
+                              }(),
                             ),
                           ),
                           SizedBox(width: 4 * scale),
@@ -2138,12 +2928,7 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
                                 ),
                                 isDense: true,
                                 isExpanded: true,
-                                items: [
-                                  ...data.professors.map((p) => DropdownMenuItem(
-                                    value: p['name'] ?? '',
-                                    child: Text(p['name'] ?? '', overflow: TextOverflow.ellipsis),
-                                  )),
-                                ],
+                                items: _buildProfDropdownItems(data, preferredBranch: branch, includeUnassigned: false),
                                 onChanged: (newProf) {
                                   if (newProf != null && newProf.isNotEmpty) {
                                     data.assignProfessor(code, newProf);
