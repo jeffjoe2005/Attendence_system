@@ -21,7 +21,7 @@ class AttendanceApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()..initialize()),
-        ChangeNotifierProvider(create: (_) => ModeratorDataProvider()),
+        ChangeNotifierProvider(create: (_) => ModeratorDataProvider(enableBackendSync: true)..syncWithBackend()),
       ],
       child: MaterialApp(
         title: 'Attendance System',

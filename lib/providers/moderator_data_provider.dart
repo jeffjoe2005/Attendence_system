@@ -5,15 +5,28 @@ import 'package:archive/archive.dart';
 import 'package:xml/xml.dart';
 import '../services/course_matcher_service.dart';
 import '../services/local_storage_service.dart';
+import '../services/api_service.dart';
+import '../services/course_api_service.dart';
+import '../services/attendance_api_service.dart';
 
 /// Shared centralized data store for Moderator, Admin, Professor, CR, and Student portals.
 /// Supports 5 engineering branches: CSE, ECE, EEE, ME, CE.
 class ModeratorDataProvider extends ChangeNotifier {
   bool _isLoadingFromStorage = false;
   bool _isSeeding = false;
+  bool _isBackendSyncEnabled = false;
   Future<void>? _loadFuture;
 
-  ModeratorDataProvider({bool seedDefaults = false, bool loadFromStorageOnStart = false}) {
+  bool get isBackendSyncEnabled => _isBackendSyncEnabled;
+  void setBackendSync(bool enabled) {
+    _isBackendSyncEnabled = enabled;
+  }
+
+  ModeratorDataProvider({
+    bool seedDefaults = false,
+    bool loadFromStorageOnStart = false,
+    bool enableBackendSync = false,
+  }) : _isBackendSyncEnabled = enableBackendSync {
     if (seedDefaults) {
       _isSeeding = true;
       seedDefaultData();
@@ -140,6 +153,15 @@ class ModeratorDataProvider extends ChangeNotifier {
       'semester': determinedSemester,
       'type': type,
     });
+    if (_isBackendSyncEnabled && !_isSeeding && !_isLoadingFromStorage) {
+      CourseApiService.instance.createCourse(
+        code: cleanCode,
+        name: cleanName,
+        branch: determinedBranch,
+        semester: determinedSemester,
+        type: type,
+      ).catchError((_) {});
+    }
     notifyListeners();
   }
 
@@ -158,15 +180,28 @@ class ModeratorDataProvider extends ChangeNotifier {
       if (mapping != null) {
         _mappings[cleanNewCode] = mapping;
       }
+      final determinedBranch = (newBranch != null && newBranch.trim().isNotEmpty)
+          ? newBranch.trim().toUpperCase()
+          : (_courses[idx]['branch'] ?? 'ECE');
+      final determinedSemester = (detectSemesterFromText(newSemester) ?? newSemester.trim());
+
       _courses[idx] = {
         'code': cleanNewCode,
         'name': newName.trim(),
-        'branch': (newBranch != null && newBranch.trim().isNotEmpty)
-            ? newBranch.trim().toUpperCase()
-            : (_courses[idx]['branch'] ?? 'ECE'),
-        'semester': (detectSemesterFromText(newSemester) ?? newSemester.trim()),
+        'branch': determinedBranch,
+        'semester': determinedSemester,
         'type': newType.trim(),
       };
+      if (_isBackendSyncEnabled && !_isSeeding && !_isLoadingFromStorage) {
+        CourseApiService.instance.updateCourse(
+          oldCode: oldCode,
+          newCode: cleanNewCode,
+          newName: newName.trim(),
+          newBranch: determinedBranch,
+          newSemester: determinedSemester,
+          newType: newType.trim(),
+        ).catchError((_) {});
+      }
       notifyListeners();
     }
   }
@@ -174,6 +209,9 @@ class ModeratorDataProvider extends ChangeNotifier {
   void removeCourse(String code) {
     _mappings.remove(code);
     _courses.removeWhere((c) => c['code'] == code);
+    if (_isBackendSyncEnabled && !_isSeeding && !_isLoadingFromStorage) {
+      CourseApiService.instance.deleteCourse(code).catchError((_) {});
+    }
     notifyListeners();
   }
 
@@ -306,6 +344,12 @@ class ModeratorDataProvider extends ChangeNotifier {
       cleaned = getProfessorNameByEmail(cleaned) ?? extractNameFromEmail(cleaned);
     }
     _mappings[courseCode.trim().toUpperCase()] = cleaned;
+    if (_isBackendSyncEnabled && !_isSeeding && !_isLoadingFromStorage) {
+      CourseApiService.instance.assignProfessor(
+        courseCode: courseCode,
+        professorName: cleaned,
+      ).catchError((_) {});
+    }
     notifyListeners();
   }
 
@@ -398,6 +442,18 @@ class ModeratorDataProvider extends ChangeNotifier {
       'totalStudents': presentRolls.length + absentRolls.length,
       'timestamp': DateTime.now(),
     });
+    if (_isBackendSyncEnabled && !_isSeeding && !_isLoadingFromStorage) {
+      AttendanceApiService.instance.recordAttendance(
+        courseCode: courseCode,
+        date: date,
+        lectureNumber: lectureNumber,
+        markedBy: markedBy,
+        markedByName: markedByName,
+        markedByRole: 'professor',
+        presentRolls: presentRolls,
+        absentRolls: absentRolls,
+      ).catchError((_) {});
+    }
     notifyListeners();
   }
 
@@ -676,6 +732,9 @@ class ModeratorDataProvider extends ChangeNotifier {
     }
 
     final profsAdded = assignImportedFaculty(rawCourses, targetBranch);
+    if (_isBackendSyncEnabled && rawCourses.isNotEmpty) {
+      CourseApiService.instance.bulkSyncCourses(rawCourses).catchError((_) => <String, dynamic>{});
+    }
     notifyListeners();
     return {'courses': coursesAdded, 'professors': profsAdded};
   }
@@ -915,6 +974,9 @@ class ModeratorDataProvider extends ChangeNotifier {
     }
 
     final profsAdded = assignImportedFaculty(rawCourses, targetBranch);
+    if (_isBackendSyncEnabled && rawCourses.isNotEmpty) {
+      CourseApiService.instance.bulkSyncCourses(rawCourses).catchError((_) => <String, dynamic>{});
+    }
     notifyListeners();
     return {'courses': coursesAdded, 'professors': profsAdded};
   }
@@ -1107,6 +1169,36 @@ class ModeratorDataProvider extends ChangeNotifier {
     _attendanceSessions.clear();
     LocalStorageService.clearStorage();
     notifyListeners();
+  }
+
+  /// Syncs in-memory courses and assignments with the AWS RDS PostgreSQL database via FastAPI
+  Future<bool> syncWithBackend() async {
+    try {
+      final isOnline = await ApiService.instance.checkConnection();
+      if (!isOnline) return false;
+      final serverCourses = await CourseApiService.instance.fetchCourses();
+      if (serverCourses.isNotEmpty) {
+        for (final c in serverCourses) {
+          final code = c['code'] ?? '';
+          if (code.isNotEmpty) {
+            final idx = _courses.indexWhere((x) => x['code'] == code);
+            if (idx != -1) {
+              _courses[idx] = c;
+            } else {
+              _courses.add(c);
+            }
+            final profName = c['professor_name'];
+            if (profName != null && profName.isNotEmpty) {
+              _mappings[code] = profName;
+            }
+          }
+        }
+        notifyListeners();
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   // ═══════════════════════════════════════════════════════════

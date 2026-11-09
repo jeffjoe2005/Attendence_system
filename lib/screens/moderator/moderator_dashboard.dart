@@ -877,8 +877,6 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
     );
   }
 
-  void _confirmResetDefaults(ModeratorDataProvider data) => _confirmResetEverything(data);
-
   @override
   Widget build(BuildContext context) {
     final data = context.watch<ModeratorDataProvider>();
