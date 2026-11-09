@@ -23,8 +23,8 @@ class ModeratorDataProvider extends ChangeNotifier {
   }
 
   ModeratorDataProvider({
-    bool seedDefaults = false,
-    bool loadFromStorageOnStart = false,
+    bool seedDefaults = true,
+    bool loadFromStorageOnStart = true,
     bool enableBackendSync = false,
   }) : _isBackendSyncEnabled = enableBackendSync {
     if (seedDefaults) {
@@ -358,11 +358,19 @@ class ModeratorDataProvider extends ChangeNotifier {
     if (assigned == null || email.trim().isEmpty) return false;
     final assignedClean = assigned.trim().toLowerCase();
     final emailClean = email.trim().toLowerCase();
-    if (assignedClean.contains(emailClean)) return true;
+    if (assignedClean.contains(emailClean) || emailClean.contains(assignedClean)) return true;
     final name = getProfessorNameByEmail(email);
     if (name != null) {
       final nameClean = name.trim().toLowerCase();
       if (assignedClean == nameClean || assignedClean.contains(nameClean) || nameClean.contains(assignedClean)) {
+        return true;
+      }
+      final normAssigned = CourseMatcherService.normalizeProfName(assigned).toLowerCase();
+      final normName = CourseMatcherService.normalizeProfName(name).toLowerCase();
+      if (normAssigned == normName || normAssigned.contains(normName) || normName.contains(normAssigned)) {
+        return true;
+      }
+      if (CourseMatcherService.isSameFaculty(assigned, name)) {
         return true;
       }
     }
@@ -582,7 +590,8 @@ class ModeratorDataProvider extends ChangeNotifier {
           final normalized = CourseMatcherService.normalizeProfName(primaryCoord);
           final email = CourseMatcherService.facultyEmails[normalized] ??
               '${normalized.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '.').replaceAll(RegExp(r'\.+'), '.')}@nitgoa.ac.in';
-          addProfessor(email, name: normalized, department: branch);
+          final dept = CourseMatcherService.getDepartmentForFaculty(normalized) ?? branch;
+          addProfessor(email, name: normalized, department: dept);
           assignProfessor(code, normalized);
           profsAssigned++;
           continue;
@@ -595,7 +604,8 @@ class ModeratorDataProvider extends ChangeNotifier {
     if (unassignedCourses.isNotEmpty) {
       final matched = CourseMatcherService.matchCourses(rawCourses: unassignedCourses);
       matched.forEach((cCode, res) {
-        addProfessor(res.professorEmail, name: res.professorName, department: targetBranch);
+        final dept = CourseMatcherService.getDepartmentForFaculty(res.professorName) ?? targetBranch;
+        addProfessor(res.professorEmail, name: res.professorName, department: dept);
         assignProfessor(cCode, res.displayMapping);
         profsAssigned++;
       });
@@ -1032,7 +1042,14 @@ class ModeratorDataProvider extends ChangeNotifier {
       _professors.clear();
       for (final p in json['professors'] as List) {
         if (p is Map) {
-          _professors.add(Map<String, String>.from(p.map((k, v) => MapEntry(k.toString(), v?.toString() ?? ''))));
+          final profMap = Map<String, String>.from(p.map((k, v) => MapEntry(k.toString(), v?.toString() ?? '')));
+          final name = profMap['name'] ?? '';
+          final officialDept = CourseMatcherService.getDepartmentForFaculty(name) ??
+              CourseMatcherService.getDepartmentForFaculty(profMap['email'] ?? '');
+          if (officialDept != null && officialDept.isNotEmpty) {
+            profMap['department'] = officialDept;
+          }
+          _professors.add(profMap);
         }
       }
     }
@@ -1049,7 +1066,12 @@ class ModeratorDataProvider extends ChangeNotifier {
     if (json['mappings'] is Map) {
       _mappings.clear();
       for (final entry in (json['mappings'] as Map).entries) {
-        _mappings[entry.key.toString().toUpperCase()] = entry.value?.toString() ?? '';
+        final code = entry.key.toString().toUpperCase();
+        var prof = entry.value?.toString() ?? '';
+        if (code == 'CS655' && (prof.contains('Najiya') || prof.isEmpty)) {
+          prof = 'Dr. Pravati Swain';
+        }
+        _mappings[code] = prof;
       }
     }
 
@@ -1331,18 +1353,38 @@ class ModeratorDataProvider extends ChangeNotifier {
       {'email': 'nithin.kumar@nitgoa.ac.in', 'name': 'Dr. Nithin Kumar Y.B.', 'department': 'ECE'},
       {'email': 't.veerakumar@nitgoa.ac.in', 'name': 'Dr. T. Veerakumar', 'department': 'ECE'},
       {'email': 'vasantha.mh@nitgoa.ac.in', 'name': 'Dr. Vasantha M.H', 'department': 'ECE'},
+      {'email': 'spatidar@nitgoa.ac.in', 'name': 'Dr. Shivnarayan Patidar', 'department': 'ECE'},
       {'email': 'ishaan.bhate@nitgoa.ac.in', 'name': 'Ishaan Bhate', 'department': 'ECE'},
+      {'email': 'prashanth.gr@nitgoa.ac.in', 'name': 'Dr. Prashanth G.R', 'department': 'ECE'},
 
       // CSE Faculty
       {'email': 'pravati.swain@nitgoa.ac.in', 'name': 'Dr. Pravati Swain', 'department': 'CSE'},
       {'email': 'damodar.reddy@nitgoa.ac.in', 'name': 'Dr. Damodar Reddy', 'department': 'CSE'},
-      {'email': 'keshavamurthy@nitgoa.ac.in', 'name': 'Dr. B. R. Chandavarkar', 'department': 'CSE'},
+      {'email': 'keshavamurthy@nitgoa.ac.in', 'name': 'Dr. Keshavamurthy B N', 'department': 'CSE'},
       {'email': 'venkat.subba@nitgoa.ac.in', 'name': 'Dr. Venkat Subba Reddy', 'department': 'CSE'},
+      {'email': 'dr.chirag.n.modi@nitgoa.ac.in', 'name': 'Dr. Chirag N Modi', 'department': 'CSE'},
+      {'email': 'dr.veena.thenkanidiyoor@nitgoa.ac.in', 'name': 'Dr. Veena Thenkanidiyoor', 'department': 'CSE'},
+      {'email': 'dr.meenakshi.panda@nitgoa.ac.in', 'name': 'Dr. Meenakshi Panda', 'department': 'CSE'},
+      {'email': 'dr.venkatnareshbabu.kuppili@nitgoa.ac.in', 'name': 'Dr. Venkatnareshbabu Kuppili', 'department': 'CSE'},
+      {'email': 'mrs.sreedivya@nitgoa.ac.in', 'name': 'Mrs Sreedivya', 'department': 'CSE'},
+      {'email': 'contract.faculty.2@nitgoa.ac.in', 'name': 'Contract Faculty 2', 'department': 'CSE'},
+      {'email': 'contract.faculty.4@nitgoa.ac.in', 'name': 'Contract Faculty 4', 'department': 'CSE'},
 
       // EEE Faculty
-      {'email': 'sreeraj.es@nitgoa.ac.in', 'name': 'Dr. Sreeraj E.S.', 'department': 'EEE'},
+      {'email': 'suresh.mikkili@nitgoa.ac.in', 'name': 'Dr. Suresh Mikkili', 'department': 'EEE'},
+      {'email': 'soumitra.das@nitgoa.ac.in', 'name': 'Dr. Soumitra Das', 'department': 'EEE'},
+      {'email': 'amol.rahulkar@nitgoa.ac.in', 'name': 'Dr. Amol D. Rahulkar', 'department': 'EEE'},
+      {'email': 'sandeep.chawrasia@nitgoa.ac.in', 'name': 'Dr. Sandeep Chawrasia', 'department': 'EEE'},
+      {'email': 'amritansh.sagar@nitgoa.ac.in', 'name': 'Dr. Amritansh Sagar', 'department': 'EEE'},
+      {'email': 'shiva.reddy@nitgoa.ac.in', 'name': 'Dr. Shiva Kumar Reddy', 'department': 'EEE'},
+      {'email': 'mahiteja.talluri@nitgoa.ac.in', 'name': 'Dr. Mahi Teja Talluri', 'department': 'EEE'},
+      {'email': 'anudevi.samuel@nitgoa.ac.in', 'name': 'Dr. Anudevi Samuel', 'department': 'EEE'},
+      {'email': 'shefali.painuli@nitgoa.ac.in', 'name': 'Ms. Shefali Painuli', 'department': 'EEE'},
+      {'email': 'ankeshwarapu.sunil@nitgoa.ac.in', 'name': 'Dr. Ankeshwarapu Sunil', 'department': 'EEE'},
+      {'email': 'vyjayanthi@nitgoa.ac.in', 'name': 'Dr. C. Vyjayanthi', 'department': 'EEE'},
+      {'email': 'sreeraj@nitgoa.ac.in', 'name': 'Dr. Sreeraj E.S.', 'department': 'EEE'},
       {'email': 'amresh.kumar@nitgoa.ac.in', 'name': 'Dr. Amresh Kumar', 'department': 'EEE'},
-      {'email': 'c.vyjayanthi@nitgoa.ac.in', 'name': 'Dr. C. Vyjayanthi', 'department': 'EEE'},
+      {'email': 'mini@nitgoa.ac.in', 'name': 'Dr. Mini S.', 'department': 'EEE'},
 
       // MCE Faculty
       {'email': 'shiba.sundar@nitgoa.ac.in', 'name': 'Dr. Shiba Sundar Mahapatra', 'department': 'MCE'},
@@ -1353,13 +1395,11 @@ class ModeratorDataProvider extends ChangeNotifier {
       {'email': 'sarath.babu@nitgoa.ac.in', 'name': 'Dr. Sarath Babu', 'department': 'CVE'},
       {'email': 'rajesh.prabhu@nitgoa.ac.in', 'name': 'Dr. Rajesh Prabhu Gaonkar', 'department': 'CVE'},
 
-      // General / Humanities
+      // Humanities & Applied Sciences
       {'email': 'sunil.kumar@nitgoa.ac.in', 'name': 'Dr. Sunil Kumar A', 'department': 'Humanities'},
       {'email': 'velavan.k@nitgoa.ac.in', 'name': 'Dr. Velavan K', 'department': 'Humanities'},
       {'email': 'sarani.ghosal@nitgoa.ac.in', 'name': 'Dr. Sarani Ghosal Mondal', 'department': 'Humanities'},
       {'email': 'rinu.koshy@nitgoa.ac.in', 'name': 'Dr. Rinu Koshy', 'department': 'Humanities'},
-      {'email': 'spatidar@nitgoa.ac.in', 'name': 'Dr. Shivnarayan Patidar', 'department': 'ECE'},
-      {'email': 'prashanth.gr@nitgoa.ac.in', 'name': 'Dr. Prashanth G.R', 'department': 'ECE'},
     ]);
 
     // ── SEED CLASS REPRESENTATIVES FOR ALL BRANCHES & SEMESTERS ──
@@ -1373,7 +1413,7 @@ class ModeratorDataProvider extends ChangeNotifier {
       {'email': 'cr.cve4@nitgoa.ac.in', 'name': 'Siddharth Pai (CVE CR)', 'branch': 'CVE', 'semester': 'IV Sem'},
     ]);
 
-    // ── SEED COURSE ↔ PROFESSOR MAPPINGS (Name Only) ──
+    // ── SEED COURSE ↔ PROFESSOR MAPPINGS ──
     // ECE IV Sem Mappings
     _mappings['EC250'] = 'Dr. Najiya V K';
     _mappings['EC251'] = 'Dr. Lokesh Kumar B';
@@ -1384,7 +1424,7 @@ class ModeratorDataProvider extends ChangeNotifier {
     _mappings['EC255'] = 'Dr. Lokesh Kumar B';
     _mappings['EC256'] = 'Dr. Pragati Patel';
 
-    // ECE VI Sem Mappings (All 12 courses matching timetable)
+    // ECE VI Sem Mappings
     _mappings['HS350'] = 'Dr. Sunil Kumar A';
     _mappings['ES300'] = 'Dr. Velavan K';
     _mappings['EC350'] = 'Dr. Trilochan Panigrahi';
@@ -1403,31 +1443,32 @@ class ModeratorDataProvider extends ChangeNotifier {
     _mappings['EC405'] = 'Dr. Vasantha M.H';
     _mappings['EC424'] = 'Ishaan Bhate';
     _mappings['EC404'] = 'Dr. E. Mallikarjun';
-    _mappings['CS522'] = 'Dr. Shivnarayan Patidar';
-    _mappings['EC499'] = 'Dr. Prashanth G.R';
+    _mappings['CS522'] = 'Dr. Trilochan Panigrahi';
+    _mappings['EC499'] = 'Dr. Trilochan Panigrahi';
     _mappings['EC450M'] = 'Dr. Prashanth G.R';
 
     // ECE M.Tech Mappings
-    _mappings['EC650'] = 'Dr. Pravati Swain';
+    _mappings['EC650'] = 'Dr. Lokesh Kumar B';
     _mappings['EC651'] = 'Dr. Lalat Indu Giri';
     _mappings['EC802'] = 'Dr. T. Veerakumar';
     _mappings['EC810'] = 'Dr. Vasantha M.H';
-    _mappings['EC804'] = 'Dr. Pravati Swain';
-    _mappings['EC652'] = 'Ishaan Bhate';
-    _mappings['EC653'] = 'Dr. Rinu Koshy';
+    _mappings['EC804'] = 'Dr. Nithin Kumar Y.B.';
+    _mappings['EC652'] = 'Dr. Vasantha M.H';
+    _mappings['EC653'] = 'Dr. E. Mallikarjun';
     _mappings['HU650'] = 'Dr. Rinu Koshy';
-    _mappings['EC750'] = 'Dr. B. R. Chandavarkar';
-    _mappings['EC903'] = 'Dr. Venkat Subba Reddy';
+    _mappings['EC750'] = 'Dr. Lalat Indu Giri';
+    _mappings['EC903'] = 'Dr. T. Veerakumar';
 
     // CSE Mappings
-    _mappings['CS250'] = 'Dr. Pravati Swain';
-    _mappings['CS251'] = 'Dr. Damodar Reddy';
-    _mappings['CS252'] = 'Dr. Venkat Subba Reddy';
-    _mappings['CS253'] = 'Dr. B. R. Chandavarkar';
-    _mappings['CS254'] = 'Dr. Venkat Subba Reddy';
+    _mappings['CS250'] = 'Contract Faculty 4';
+    _mappings['CS251'] = 'Contract Faculty 2';
+    _mappings['CS252'] = 'Dr. Veena Thenkanidiyoor';
+    _mappings['CS253'] = 'Mrs Sreedivya';
+    _mappings['CS254'] = 'Dr. Prashanth G.R';
     _mappings['CS350'] = 'Dr. Damodar Reddy';
-    _mappings['CS351'] = 'Dr. Pravati Swain';
-    _mappings['CS352'] = 'Dr. B. R. Chandavarkar';
+    _mappings['CS351'] = 'Dr. Keshavamurthy B N';
+    _mappings['CS352'] = 'Dr. Meenakshi Panda';
+    _mappings['CS522'] = 'Dr. Chirag N Modi';
 
     // EEE Mappings
     _mappings['EE250'] = 'Dr. Sreeraj E.S.';
@@ -1436,22 +1477,25 @@ class ModeratorDataProvider extends ChangeNotifier {
     _mappings['EE253'] = 'Dr. Amresh Kumar';
     _mappings['EE350'] = 'Dr. C. Vyjayanthi';
     _mappings['EE351'] = 'Dr. Sreeraj E.S.';
-    _mappings['EE401'] = 'Dr. Amresh Kumar';
+    _mappings['EE401'] = 'Dr. Suresh Mikkili';
 
-    // ME Mappings
+    // ME / MCE Mappings
     _mappings['ME250'] = 'Dr. Shiba Sundar Mahapatra';
     _mappings['ME251'] = 'Dr. Ravi Raghav';
     _mappings['ME252'] = 'Dr. Prashant Kumar';
     _mappings['ME253'] = 'Dr. Shiba Sundar Mahapatra';
     _mappings['ME350'] = 'Dr. Ravi Raghav';
     _mappings['ME351'] = 'Dr. Prashant Kumar';
+    _mappings['ME401'] = 'Dr. Shiba Sundar Mahapatra';
 
-    // CE Mappings
+    // CE / CVE Mappings
     _mappings['CE250'] = 'Dr. Sarath Babu';
     _mappings['CE251'] = 'Dr. Rajesh Prabhu Gaonkar';
     _mappings['CE252'] = 'Dr. Sarath Babu';
     _mappings['CE253'] = 'Dr. Rajesh Prabhu Gaonkar';
     _mappings['CE350'] = 'Dr. Sarath Babu';
+    _mappings['CE351'] = 'Dr. Rajesh Prabhu Gaonkar';
+    _mappings['CE401'] = 'Dr. Sarath Babu';
 
     // ── SEED REALISTIC STUDENTS FOR BOTH VI SEM AND IV SEM ──
     _students.addAll([

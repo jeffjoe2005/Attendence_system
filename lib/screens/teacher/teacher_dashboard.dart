@@ -19,11 +19,13 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
     final modData = context.watch<ModeratorDataProvider>();
 
     // Determine active professor email
-    if (_selectedProfEmail == null) {
+    if (_selectedProfEmail == null || !modData.professors.any((p) => p['email'] == _selectedProfEmail)) {
       if (auth.userEmail.isNotEmpty && modData.isProfessorEmail(auth.userEmail)) {
         _selectedProfEmail = auth.userEmail;
       } else if (modData.professors.isNotEmpty) {
         _selectedProfEmail = modData.professors.first['email'];
+      } else {
+        _selectedProfEmail = null;
       }
     }
 
@@ -100,7 +102,7 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
                 Expanded(
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
-                      value: _selectedProfEmail,
+                      value: modData.professors.any((p) => p['email'] == _selectedProfEmail) ? _selectedProfEmail : null,
                       isDense: true,
                       isExpanded: true,
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
@@ -335,9 +337,12 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
 
     int lectureNumber = modData.getSessionsForCourse(code).length + 1;
     // Map to track attendance status: studentRoll -> bool isPresent
-    final Map<String, bool> attendanceState = {
-      for (final s in students) s['roll'] ?? '': true, // Default all present
-    };
+    final Map<String, bool> attendanceState = {};
+    for (int idx = 0; idx < students.length; idx++) {
+      final roll = (students[idx]['roll'] ?? '').trim();
+      final key = roll.isNotEmpty ? roll : 'student_$idx';
+      attendanceState[key] = true;
+    }
 
     showModalBottomSheet(
       context: context,
@@ -470,12 +475,13 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
                         final s = students[i];
                         final roll = s['roll'] ?? '';
                         final sName = s['name'] ?? '';
-                        final isPresent = attendanceState[roll] ?? true;
+                        final studentKey = roll.trim().isNotEmpty ? roll.trim() : 'student_$i';
+                        final isPresent = attendanceState[studentKey] ?? true;
 
                         return InkWell(
                           onTap: () {
                             setSheetState(() {
-                              attendanceState[roll] = !isPresent;
+                              attendanceState[studentKey] = !isPresent;
                             });
                           },
                           child: Padding(
