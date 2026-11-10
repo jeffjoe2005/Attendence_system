@@ -1535,45 +1535,161 @@ class ModeratorDataProvider extends ChangeNotifier {
       }
     }
 
-    // ── SEED INITIAL ATTENDANCE SESSIONS (VI Sem and IV Sem) ──
-    _attendanceSessions.addAll([
-      {
-        'id': 'att_EC350_2026-03-24_1',
-        'courseCode': 'EC350',
-        'date': '2026-03-24',
-        'lectureNumber': 1,
-        'markedBy': 'trilochan.panigrahi@nitgoa.ac.in',
-        'markedByName': 'Dr. Trilochan Panigrahi',
-        'presentRolls': <String>['22ECE001', '22ECE045', '22ECE032', '22ECE050'],
-        'absentRolls': <String>['22ECE018'],
-        'totalStudents': 5,
-        'timestamp': DateTime.now().subtract(const Duration(days: 3)),
+    // ── SEED INITIAL ATTENDANCE SESSIONS (VI Sem & IV Sem across branches) ──
+    void seedCourseSessions({
+      required String courseCode,
+      required String markedBy,
+      required String markedByName,
+      required List<String> roster,
+      required int totalLectures,
+      required Map<String, int> presentCounts,
+    }) {
+      for (int lec = 1; lec <= totalLectures; lec++) {
+        final presents = <String>[];
+        final absents = <String>[];
+        for (int sIdx = 0; sIdx < roster.length; sIdx++) {
+          final roll = roster[sIdx];
+          final targetPresent = presentCounts[roll] ?? ((totalLectures * (7 + (sIdx % 3))) ~/ 10);
+          if (lec <= targetPresent) {
+            presents.add(roll);
+          } else {
+            absents.add(roll);
+          }
+        }
+        final dayOffset = totalLectures - lec + 1;
+        final sessionDate = DateTime.now().subtract(Duration(days: dayOffset));
+        final dateStr =
+            '${sessionDate.year}-${sessionDate.month.toString().padLeft(2, '0')}-${sessionDate.day.toString().padLeft(2, '0')}';
+        _attendanceSessions.add({
+          'id': 'att_${courseCode}_${dateStr}_$lec',
+          'courseCode': courseCode,
+          'date': dateStr,
+          'lectureNumber': lec,
+          'markedBy': markedBy,
+          'markedByName': markedByName,
+          'presentRolls': presents,
+          'absentRolls': absents,
+          'totalStudents': roster.length,
+          'timestamp': sessionDate,
+        });
+      }
+    }
+
+    const ece6Roster = ['22ECE001', '22ECE045', '22ECE032', '22ECE018', '22ECE050'];
+    final ece6Specs = <List<dynamic>>[
+      ['HS350', 'sunil.kumar@nitgoa.ac.in', 'Dr. Sunil Kumar A', 10, {'22ECE001': 9, '22ECE045': 8, '22ECE032': 10, '22ECE018': 7, '22ECE050': 8}],
+      ['ES300', 'velavan.k@nitgoa.ac.in', 'Dr. Velavan K', 8, {'22ECE001': 6, '22ECE045': 7, '22ECE032': 7, '22ECE018': 5, '22ECE050': 6}],
+      ['EC350', 'trilochan.panigrahi@nitgoa.ac.in', 'Dr. Trilochan Panigrahi', 10, {'22ECE001': 8, '22ECE045': 9, '22ECE032': 7, '22ECE018': 6, '22ECE050': 9}],
+      ['EC351', 'anirban.chatterjee@nitgoa.ac.in', 'Dr. Anirban Chatterjee', 10, {'22ECE001': 6, '22ECE045': 8, '22ECE032': 9, '22ECE018': 8, '22ECE050': 7}],
+      ['EC352', 'nithin.kumar@nitgoa.ac.in', 'Dr. Nithin Kumar Y.B.', 9, {'22ECE001': 8, '22ECE045': 7, '22ECE032': 8, '22ECE018': 6, '22ECE050': 8}],
+      ['EC520', 't.veerakumar@nitgoa.ac.in', 'Dr. T. Veerakumar', 8, {'22ECE001': 5, '22ECE045': 6, '22ECE032': 7, '22ECE018': 7, '22ECE050': 5}],
+      ['CS901', 'damodar.reddy@nitgoa.ac.in', 'Dr. Damodar Reddy', 6, {'22ECE001': 5, '22ECE045': 4, '22ECE032': 6, '22ECE018': 5, '22ECE050': 4}],
+      ['EC350M', 'anirban.chatterjee@nitgoa.ac.in', 'Dr. Anirban Chatterjee', 5, {'22ECE001': 4, '22ECE045': 5, '22ECE032': 3, '22ECE018': 4, '22ECE050': 4}],
+      ['EC353', 'trilochan.panigrahi@nitgoa.ac.in', 'Dr. Trilochan Panigrahi', 4, {'22ECE001': 4, '22ECE045': 3, '22ECE032': 4, '22ECE018': 2, '22ECE050': 3}],
+      ['EC354', 'spatidar@nitgoa.ac.in', 'Dr. Shivnarayan Patidar', 4, {'22ECE001': 3, '22ECE045': 4, '22ECE032': 3, '22ECE018': 3, '22ECE050': 4}],
+      ['EC355', 'nithin.kumar@nitgoa.ac.in', 'Dr. Nithin Kumar Y.B.', 4, {'22ECE001': 2, '22ECE045': 3, '22ECE032': 4, '22ECE018': 3, '22ECE050': 2}],
+    ];
+    for (final spec in ece6Specs) {
+      seedCourseSessions(
+        courseCode: spec[0] as String,
+        markedBy: spec[1] as String,
+        markedByName: spec[2] as String,
+        roster: ece6Roster,
+        totalLectures: spec[3] as int,
+        presentCounts: spec[4] as Map<String, int>,
+      );
+    }
+
+    // Seed sample sessions for CSE, EEE, MCE, CVE VI Sem & ECE IV Sem
+    seedCourseSessions(
+      courseCode: 'CS350',
+      markedBy: 'damodar.reddy@nitgoa.ac.in',
+      markedByName: 'Dr. Damodar Reddy',
+      roster: const ['22CSE010'],
+      totalLectures: 10,
+      presentCounts: const {'22CSE010': 9},
+    );
+    seedCourseSessions(
+      courseCode: 'CS351',
+      markedBy: 'keshavamurthy@nitgoa.ac.in',
+      markedByName: 'Dr. Keshavamurthy B N',
+      roster: const ['22CSE010'],
+      totalLectures: 8,
+      presentCounts: const {'22CSE010': 6},
+    );
+    seedCourseSessions(
+      courseCode: 'CS352',
+      markedBy: 'dr.meenakshi.panda@nitgoa.ac.in',
+      markedByName: 'Dr. Meenakshi Panda',
+      roster: const ['22CSE010'],
+      totalLectures: 6,
+      presentCounts: const {'22CSE010': 4},
+    );
+    seedCourseSessions(
+      courseCode: 'EE350',
+      markedBy: 'vyjayanthi@nitgoa.ac.in',
+      markedByName: 'Dr. C. Vyjayanthi',
+      roster: const ['22EEE005'],
+      totalLectures: 10,
+      presentCounts: const {'22EEE005': 8},
+    );
+    seedCourseSessions(
+      courseCode: 'EE351',
+      markedBy: 'sreeraj@nitgoa.ac.in',
+      markedByName: 'Dr. Sreeraj E.S.',
+      roster: const ['22EEE005'],
+      totalLectures: 8,
+      presentCounts: const {'22EEE005': 5},
+    );
+    seedCourseSessions(
+      courseCode: 'ME350',
+      markedBy: 'ravi.raghav@nitgoa.ac.in',
+      markedByName: 'Dr. Ravi Raghav',
+      roster: const ['22MCE007'],
+      totalLectures: 10,
+      presentCounts: const {'22MCE007': 9},
+    );
+    seedCourseSessions(
+      courseCode: 'ME351',
+      markedBy: 'prashant.kumar@nitgoa.ac.in',
+      markedByName: 'Dr. Prashant Kumar',
+      roster: const ['22MCE007'],
+      totalLectures: 8,
+      presentCounts: const {'22MCE007': 6},
+    );
+    seedCourseSessions(
+      courseCode: 'CE350',
+      markedBy: 'sarath.babu@nitgoa.ac.in',
+      markedByName: 'Dr. Sarath Babu',
+      roster: const ['22CVE003'],
+      totalLectures: 9,
+      presentCounts: const {'22CVE003': 8},
+    );
+    seedCourseSessions(
+      courseCode: 'CE351',
+      markedBy: 'rajesh.prabhu@nitgoa.ac.in',
+      markedByName: 'Dr. Rajesh Prabhu Gaonkar',
+      roster: const ['22CVE003'],
+      totalLectures: 7,
+      presentCounts: const {'22CVE003': 5},
+    );
+    seedCourseSessions(
+      courseCode: 'EC250',
+      markedBy: 'najiya.vk@nitgoa.ac.in',
+      markedByName: 'Dr. Najiya V K',
+      roster: const ['24ECE001', '24ECE002', '24ECE003', '24ECE004', '24ECE005', '24ECE006', '24ECE007', '24ECE008'],
+      totalLectures: 10,
+      presentCounts: const {
+        '24ECE001': 9,
+        '24ECE002': 8,
+        '24ECE003': 7,
+        '24ECE004': 6,
+        '24ECE005': 9,
+        '24ECE006': 8,
+        '24ECE007': 10,
+        '24ECE008': 5,
       },
-      {
-        'id': 'att_HS350_2026-03-25_1',
-        'courseCode': 'HS350',
-        'date': '2026-03-25',
-        'lectureNumber': 1,
-        'markedBy': 'sunil.kumar@nitgoa.ac.in',
-        'markedByName': 'Dr. Sunil Kumar A',
-        'presentRolls': <String>['22ECE001', '22ECE045', '22ECE032', '22ECE018', '22ECE050'],
-        'absentRolls': <String>[],
-        'totalStudents': 5,
-        'timestamp': DateTime.now().subtract(const Duration(days: 2)),
-      },
-      {
-        'id': 'att_EC250_2026-03-24_1',
-        'courseCode': 'EC250',
-        'date': '2026-03-24',
-        'lectureNumber': 1,
-        'markedBy': 'najiya.vk@nitgoa.ac.in',
-        'markedByName': 'Dr. Najiya V K',
-        'presentRolls': <String>['24ECE001', '24ECE002', '24ECE003', '24ECE004', '24ECE005', '24ECE006', '24ECE007'],
-        'absentRolls': <String>['24ECE008'],
-        'totalStudents': 8,
-        'timestamp': DateTime.now().subtract(const Duration(days: 2)),
-      },
-    ]);
+    );
 
     notifyListeners();
   }

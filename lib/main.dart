@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'config/constants.dart';
 import 'config/theme.dart';
 import 'providers/auth_provider.dart';
 import 'providers/moderator_data_provider.dart';
@@ -23,7 +22,9 @@ class AttendanceApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()..initialize()),
-        ChangeNotifierProvider(create: (_) => ModeratorDataProvider(enableBackendSync: true)..syncWithBackend()),
+        ChangeNotifierProvider(
+            create: (_) => ModeratorDataProvider(enableBackendSync: true)
+              ..syncWithBackend()),
       ],
       child: MaterialApp(
         title: 'Attendance System',
@@ -46,7 +47,8 @@ class AppRouter extends StatelessWidget {
     if (!auth.isInitialized) {
       return const Scaffold(
         backgroundColor: Colors.white,
-        body: Center(child: CircularProgressIndicator(color: Color(0xFF0F172A))),
+        body:
+            Center(child: CircularProgressIndicator(color: Color(0xFF0F172A))),
       );
     }
 
@@ -54,18 +56,8 @@ class AppRouter extends StatelessWidget {
       return const LoginScreen();
     }
 
-    switch (auth.userRole.toLowerCase()) {
-      case AppConstants.roleModerator:
-        return const ModeratorDashboard();
-      // case AppConstants.roleAdmin:
-      //   return const AdminDashboard();
-      case AppConstants.roleProfessor:
-        return const ProfessorDashboard();
-      case AppConstants.roleCR:
-        return const CRDashboard();
-      default:
-        return const StudentDashboard();
-    }
+    // All @nitgoa.ac.in accounts open the Student Portal directly.
+    return const StudentDashboard();
   }
 }
 
@@ -108,8 +100,10 @@ class _PortalShellState extends State<PortalShell> {
           backgroundColor: Colors.white,
           selectedItemColor: const Color(0xFF0F172A),
           unselectedItemColor: const Color(0xFF94A3B8),
-          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11),
-          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 11),
+          selectedLabelStyle:
+              const TextStyle(fontWeight: FontWeight.w700, fontSize: 11),
+          unselectedLabelStyle:
+              const TextStyle(fontWeight: FontWeight.w500, fontSize: 11),
           items: const [
             BottomNavigationBarItem(
               icon: Icon(Icons.shield_outlined, size: 20),
