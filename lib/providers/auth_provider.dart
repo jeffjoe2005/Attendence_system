@@ -13,7 +13,7 @@ class AuthProvider extends ChangeNotifier {
   UserModel? _userModel;
   bool _isLoading = false;
   String? _error;
-  bool _isInitialized = false;
+  bool _isInitialized = true;
   bool _isBackendConnected = false;
 
   // ─── Getters ──────────────────────────────────────────────

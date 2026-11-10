@@ -6,6 +6,7 @@ import 'package:attendance_system/providers/auth_provider.dart';
 import 'package:attendance_system/providers/moderator_data_provider.dart';
 import 'package:attendance_system/screens/auth/login_screen.dart';
 import 'package:attendance_system/screens/student/student_dashboard.dart';
+import 'package:attendance_system/services/api_service.dart';
 
 void main() {
   testWidgets('Student Portal shows registered courses, counts, percentages, and Red/Yellow/Green highlights without top summary or bars', (tester) async {
@@ -214,6 +215,9 @@ void main() {
   });
 
   testWidgets('AppRouter directs any @nitgoa.ac.in authenticated user directly to StudentDashboard', (tester) async {
+    ApiService.testMode = true;
+    addTearDown(() => ApiService.testMode = false);
+
     final modData = ModeratorDataProvider(
       seedDefaults: true,
       loadFromStorageOnStart: false,
@@ -229,15 +233,18 @@ void main() {
         child: const MaterialApp(home: AppRouter()),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pumpAndSettle(const Duration(seconds: 5));
 
     // Prior to login, LoginScreen is shown with Google sign-in button
     expect(find.byType(LoginScreen), findsOneWidget);
     expect(find.byType(StudentDashboard), findsNothing);
 
     // Sign in with any @nitgoa.ac.in account
-    await auth.signInWithEmail('anyuser@nitgoa.ac.in', modData: modData);
-    await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      await auth.signInWithEmail('anyuser@nitgoa.ac.in', modData: modData);
+    });
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
 
     // Verified: Opens directly in StudentDashboard
     expect(find.byType(LoginScreen), findsNothing);

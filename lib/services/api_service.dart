@@ -26,11 +26,11 @@ class ApiService {
           ? _envBaseUrl.substring(0, _envBaseUrl.length - 1)
           : _envBaseUrl;
     }
-    if (kIsWeb) return 'http://localhost:8000';
+    if (kIsWeb) return 'http://localhost:8001';
     try {
-      if (Platform.isAndroid) return 'http://10.0.2.2:8000';
+      if (Platform.isAndroid) return 'http://localhost:8001';
     } catch (_) {}
-    return 'http://localhost:8000';
+    return 'http://localhost:8001';
   }
 
   static String get baseUrl => _baseUrl;
@@ -76,36 +76,46 @@ class ApiService {
     return h;
   }
 
+  /// Set to true in tests to skip real HTTP calls in checkConnection().
+  static bool testMode = false;
+
   /// Health check to detect if the backend server is reachable
   Future<bool> checkConnection() async {
-    bool isAndroid = false;
+    if (testMode) return false;
     try {
-      isAndroid = !kIsWeb && Platform.isAndroid;
+      if (Platform.environment.containsKey('FLUTTER_TEST')) return false;
     } catch (_) {}
 
-    if (isAndroid && !_hasCustomBaseUrl) {
-      for (final candidate in const ['http://localhost:8000', 'http://10.0.2.2:8000']) {
-        try {
-          final res = await http
-              .get(Uri.parse('$candidate/api/health'))
-              .timeout(Duration(seconds: candidate.contains('localhost') ? 1 : 3));
-          if (res.statusCode == 200) {
-            _baseUrl = candidate;
-            return true;
-          }
-        } catch (_) {}
+    if (_hasCustomBaseUrl) {
+      try {
+        final res = await http.get(
+          Uri.parse('$_baseUrl/api/health'),
+        ).timeout(const Duration(seconds: 3));
+        return res.statusCode == 200;
+      } catch (_) {
+        return false;
       }
-      return false;
     }
 
-    try {
-      final res = await http.get(
-        Uri.parse('$_baseUrl/api/health'),
-      ).timeout(const Duration(seconds: 4));
-      return res.statusCode == 200;
-    } catch (_) {
-      return false;
+    final candidates = [
+      'http://localhost:8001',
+      'http://localhost:8000',
+      'http://10.0.2.2:8001',
+      'http://10.0.2.2:8000',
+    ];
+
+    for (final candidate in candidates) {
+      try {
+        final res = await http
+            .get(Uri.parse('$candidate/api/health'))
+            .timeout(const Duration(milliseconds: 1500));
+        if (res.statusCode == 200) {
+          _baseUrl = candidate;
+          return true;
+        }
+      } catch (_) {}
     }
+    return false;
   }
 
   /// HTTP GET

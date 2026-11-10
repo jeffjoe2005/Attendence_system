@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../models/user_model.dart';
@@ -10,11 +11,20 @@ class AuthApiService {
   static const String _webClientId =
       '592828977116-qnjuo9akgsg7lhb1jr5gf5msr49hmbo7.apps.googleusercontent.com';
 
+  static const List<String> developerEmails = [
+    'sparshraul2@gmail.com',
+  ];
+
+  static bool isAllowedEmail(String email) {
+    final clean = email.trim().toLowerCase();
+    if (developerEmails.contains(clean)) return true;
+    return clean.endsWith('@nitgoa.ac.in');
+  }
+
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: ['email', 'profile'],
     clientId: kIsWeb ? _webClientId : null,
     serverClientId: kIsWeb ? null : _webClientId,
-    hostedDomain: 'nitgoa.ac.in',
   );
 
   /// Authenticates using native Google Sign-In and verifies server-side with FastAPI
@@ -26,7 +36,7 @@ class AuthApiService {
       }
 
       final email = googleUser.email.trim().toLowerCase();
-      if (!email.endsWith('@nitgoa.ac.in')) {
+      if (!isAllowedEmail(email)) {
         await _googleSignIn.signOut();
         throw Exception(
           'Access restricted: Only @nitgoa.ac.in email accounts are permitted.',
@@ -51,6 +61,8 @@ class AuthApiService {
 
       final userJson = data['user'] as Map<String, dynamic>;
       return _parseUserModel(userJson);
+    } on TimeoutException {
+      throw Exception('Server unreachable: Could not connect to backend on port 8001.');
     } catch (e) {
       debugPrint('Google Sign-In Error: $e');
       rethrow;

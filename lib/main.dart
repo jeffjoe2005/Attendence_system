@@ -56,7 +56,11 @@ class AppRouter extends StatelessWidget {
       return const LoginScreen();
     }
 
-    // All @nitgoa.ac.in accounts open the Student Portal directly.
+    if (auth.userRole.toLowerCase() == 'developer') {
+      return const PortalShell();
+    }
+
+    // All other @nitgoa.ac.in accounts open the Student Portal directly.
     return const StudentDashboard();
   }
 }
