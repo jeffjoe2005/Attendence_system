@@ -12,12 +12,20 @@ class ApiService {
   static String? _cachedToken;
 
   /// Default API URL:
-  /// - Android Emulator: 10.0.2.2:8000
+  /// - Override at build time via `--dart-define=API_BASE_URL=...`
+  /// - Android Emulator: 10.0.2.2:8000 (auto-detects adb-reversed localhost:8000 on physical devices)
   /// - Windows / Web / iOS Simulator: localhost:8000
-  /// - EC2 / Production: Set via setBaseUrl("https://your-ec2-domain.com")
+  /// - EC2 / Production: Set via setBaseUrl("https://your-ec2-domain.com") or API_BASE_URL
+  static const String _envBaseUrl = String.fromEnvironment('API_BASE_URL');
+  static bool _hasCustomBaseUrl = _envBaseUrl.isNotEmpty;
   static String _baseUrl = _defaultBaseUrl();
 
   static String _defaultBaseUrl() {
+    if (_envBaseUrl.isNotEmpty) {
+      return _envBaseUrl.endsWith('/')
+          ? _envBaseUrl.substring(0, _envBaseUrl.length - 1)
+          : _envBaseUrl;
+    }
     if (kIsWeb) return 'http://localhost:8000';
     try {
       if (Platform.isAndroid) return 'http://10.0.2.2:8000';
@@ -27,6 +35,7 @@ class ApiService {
 
   static String get baseUrl => _baseUrl;
   static void setBaseUrl(String url) {
+    _hasCustomBaseUrl = true;
     _baseUrl = url.endsWith('/') ? url.substring(0, url.length - 1) : url;
   }
 
@@ -69,6 +78,26 @@ class ApiService {
 
   /// Health check to detect if the backend server is reachable
   Future<bool> checkConnection() async {
+    bool isAndroid = false;
+    try {
+      isAndroid = !kIsWeb && Platform.isAndroid;
+    } catch (_) {}
+
+    if (isAndroid && !_hasCustomBaseUrl) {
+      for (final candidate in const ['http://localhost:8000', 'http://10.0.2.2:8000']) {
+        try {
+          final res = await http
+              .get(Uri.parse('$candidate/api/health'))
+              .timeout(Duration(seconds: candidate.contains('localhost') ? 1 : 3));
+          if (res.statusCode == 200) {
+            _baseUrl = candidate;
+            return true;
+          }
+        } catch (_) {}
+      }
+      return false;
+    }
+
     try {
       final res = await http.get(
         Uri.parse('$_baseUrl/api/health'),

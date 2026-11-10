@@ -7,8 +7,13 @@ class AuthApiService {
   AuthApiService._();
   static final AuthApiService instance = AuthApiService._();
 
+  static const String _webClientId =
+      '592828977116-qnjuo9akgsg7lhb1jr5gf5msr49hmbo7.apps.googleusercontent.com';
+
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: ['email', 'profile'],
+    clientId: kIsWeb ? _webClientId : null,
+    serverClientId: kIsWeb ? null : _webClientId,
   );
 
   /// Authenticates using native Google Sign-In and verifies server-side with FastAPI
@@ -26,6 +31,7 @@ class AuthApiService {
         throw Exception('Failed to obtain Google ID Token.');
       }
 
+      await ApiService.instance.checkConnection();
       final data = await ApiService.instance.post(
         '/api/auth/google',
         body: {'id_token': idToken},
