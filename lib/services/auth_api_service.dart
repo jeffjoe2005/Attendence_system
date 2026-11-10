@@ -14,6 +14,7 @@ class AuthApiService {
     scopes: ['email', 'profile'],
     clientId: kIsWeb ? _webClientId : null,
     serverClientId: kIsWeb ? null : _webClientId,
+    hostedDomain: 'nitgoa.ac.in',
   );
 
   /// Authenticates using native Google Sign-In and verifies server-side with FastAPI
@@ -22,6 +23,14 @@ class AuthApiService {
       final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
         throw Exception('Google Sign-In was cancelled by the user.');
+      }
+
+      final email = googleUser.email.trim().toLowerCase();
+      if (!email.endsWith('@nitgoa.ac.in')) {
+        await _googleSignIn.signOut();
+        throw Exception(
+          'Access restricted: Only @nitgoa.ac.in email accounts are permitted.',
+        );
       }
 
       final googleAuth = await googleUser.authentication;
