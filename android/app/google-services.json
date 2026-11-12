@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "592828977116-6jb8sb6e9pl2pnl2vg0a97bbebdc7iv0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "ac.in.nitgoa.attendance_system",
+            "certificate_hash": "600eecc613398171f82a2e14fa9ff1132fa1de2a"
+          }
+        },
+        {
           "client_id": "592828977116-qnjuo9akgsg7lhb1jr5gf5msr49hmbo7.apps.googleusercontent.com",
           "client_type": 3
         }

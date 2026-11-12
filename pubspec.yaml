@@ -10,6 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
 
+  crypto: ^3.0.7
   cupertino_icons: ^1.0.8
 
   # State Management
@@ -31,6 +32,8 @@ dependencies:
   google_sign_in: ^6.2.1
   flutter_secure_storage: ^9.2.2
   jwt_decoder: ^2.0.1
+  firebase_core: ^5.1.0
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:

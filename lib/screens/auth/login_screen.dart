@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/auth_api_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -26,6 +27,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+    final googleSignInSupported = AuthApiService.supportsGoogleSignIn;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -76,11 +78,30 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 32),
-
+                  if (!googleSignInSupported)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 18),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFBEB),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFFDE68A)),
+                      ),
+                      child: const Text(
+                        'Google sign-in is not configured for this platform.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF92400E),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
                   if (auth.error != null)
                     Container(
                       margin: const EdgeInsets.only(bottom: 18),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
                       decoration: BoxDecoration(
                         color: const Color(0xFFFEE2E2),
                         borderRadius: BorderRadius.circular(8),
@@ -88,7 +109,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.error_outline_rounded, size: 18, color: Color(0xFFDC2626)),
+                          const Icon(Icons.error_outline_rounded,
+                              size: 18, color: Color(0xFFDC2626)),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -101,7 +123,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                           IconButton(
-                            icon: const Icon(Icons.close, size: 16, color: Color(0xFFDC2626)),
+                            icon: const Icon(Icons.close,
+                                size: 16, color: Color(0xFFDC2626)),
                             onPressed: () => auth.clearError(),
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
@@ -109,23 +132,27 @@ class _LoginScreenState extends State<LoginScreen> {
                         ],
                       ),
                     ),
-
                   SizedBox(
                     width: double.infinity,
                     height: 50,
                     child: OutlinedButton(
-                      onPressed: auth.isLoading ? null : _handleGoogleSignIn,
+                      onPressed: auth.isLoading || !googleSignInSupported
+                          ? null
+                          : _handleGoogleSignIn,
                       style: OutlinedButton.styleFrom(
                         backgroundColor: Colors.white,
-                        side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.5),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        side: const BorderSide(
+                            color: Color(0xFFCBD5E1), width: 1.5),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
                         elevation: 0,
                       ),
                       child: auth.isLoading
                           ? const SizedBox(
                               height: 20,
                               width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0F172A)),
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Color(0xFF0F172A)),
                             )
                           : Row(
                               mainAxisAlignment: MainAxisAlignment.center,

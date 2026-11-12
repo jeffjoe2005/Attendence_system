@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
+import 'firebase_options.dart';
 import 'config/theme.dart';
 import 'providers/auth_provider.dart';
 import 'providers/moderator_data_provider.dart';
@@ -10,7 +12,11 @@ import 'screens/teacher/teacher_dashboard.dart';
 import 'screens/moderator/moderator_dashboard.dart';
 import 'screens/cr/cr_dashboard.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const AttendanceApp());
 }
 
