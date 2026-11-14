@@ -175,9 +175,11 @@ class AuthApiService {
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
 import {getAuth,GoogleAuthProvider,signInWithPopup} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 const app=initializeApp($config), auth=getAuth(app), state=${jsonEncode(state)};
+const provider=new GoogleAuthProvider();
+provider.setCustomParameters({prompt:'select_account'});
 document.getElementById('signin').addEventListener('click',async()=>{
  const button=document.getElementById('signin'), message=document.getElementById('message'); button.disabled=true; message.textContent='';
- try { const result=await signInWithPopup(auth,new GoogleAuthProvider()); const idToken=await result.user.getIdToken();
+ try { const result=await signInWithPopup(auth,provider); const idToken=await result.user.getIdToken();
   const response=await fetch('/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({state,idToken})});
   if(!response.ok) throw new Error('Could not return sign-in to the app.'); document.body.innerHTML='<h2>Sign-in complete</h2><p>You can close this tab and return to the app.</p>';
  } catch(error) { message.textContent=error.message||'Sign-in failed. Please try again.'; button.disabled=false; }
