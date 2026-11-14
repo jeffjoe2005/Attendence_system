@@ -7,7 +7,7 @@ import 'providers/auth_provider.dart';
 import 'providers/moderator_data_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/student/student_dashboard.dart';
-import 'screens/teacher/teacher_dashboard.dart';
+import 'screens/teacher/local_professor_portal.dart';
 // import 'screens/hod/hod_dashboard.dart'; // Kept intact: Admin portal backend & dashboard logic preserved
 import 'screens/moderator/moderator_dashboard.dart';
 import 'screens/cr/cr_dashboard.dart';
@@ -29,8 +29,7 @@ class AttendanceApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()..initialize()),
         ChangeNotifierProvider(
-            create: (_) => ModeratorDataProvider(enableBackendSync: true)
-              ..syncWithBackend()),
+            create: (_) => ModeratorDataProvider()..initializeLocalPrototype()),
       ],
       child: MaterialApp(
         title: 'Attendance System',
@@ -66,7 +65,12 @@ class AppRouter extends StatelessWidget {
       return const PortalShell();
     }
 
-    // All other @nitgoa.ac.in accounts open the Student Portal directly.
+    final localData = context.watch<ModeratorDataProvider>();
+    if (localData.resolveLocalProfessor(auth.userEmail) != null) {
+      return const UpdatedProfessorPortal();
+    }
+
+    // Preserve the original routing for other accounts.
     return const StudentDashboard();
   }
 }
@@ -86,7 +90,7 @@ class _PortalShellState extends State<PortalShell> {
   final List<Widget> _portals = const [
     ModeratorDashboard(),
     // AdminDashboard(), // Temporarily hidden from frontend; backend logic kept alive
-    ProfessorDashboard(),
+    UpdatedProfessorPortal(),
     CRDashboard(),
     StudentDashboard(),
   ];
@@ -140,4 +144,10 @@ class _PortalShellState extends State<PortalShell> {
       ),
     );
   }
+}
+
+class UpdatedProfessorPortal extends StatelessWidget {
+  const UpdatedProfessorPortal({super.key});
+  @override
+  Widget build(BuildContext context) => const LocalProfessorPortal();
 }

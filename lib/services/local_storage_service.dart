@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Local JSON persistence service for the Attendance System.
 /// Stores courses, faculty mappings, students, CRs, and attendance records
@@ -10,10 +11,18 @@ class LocalStorageService {
   LocalStorageService._();
 
   static const String _fileName = 'nit_goa_attendance_data.json';
+  static const _webStorage = FlutterSecureStorage();
+  static Future<bool> _pendingSave = Future.value(true);
 
   /// Resolves the storage file location across platforms (Documents folder or AppData).
   static Future<File> getStorageFile() async {
     try {
+      final override = Platform.environment['ATTENDANCE_STORAGE_DIR'];
+      if (override != null && override.isNotEmpty) {
+        final folder = Directory(override);
+        await folder.create(recursive: true);
+        return File('${folder.path}/$_fileName');
+      }
       final dir = await getApplicationDocumentsDirectory();
       final appDir = Directory('${dir.path}/NITGoa_Attendance');
       if (!await appDir.exists()) {
@@ -33,14 +42,21 @@ class LocalStorageService {
   }
 
   /// Saves the complete system state to disk as formatted JSON.
-  static Future<bool> saveState(Map<String, dynamic> state) async {
+  static Future<bool> saveState(Map<String, dynamic> state) {
+    final encoded = const JsonEncoder.withIndent('  ').convert({
+      'version': 1, 'lastSaved': DateTime.now().toIso8601String(), ...state,
+    });
+    _pendingSave = _pendingSave.then((_) => _writeState(encoded));
+    return _pendingSave;
+  }
+
+  static Future<bool> _writeState(String jsonString) async {
     try {
+      if (kIsWeb) {
+        await _webStorage.write(key: _fileName, value: jsonString);
+        return true;
+      }
       final file = await getStorageFile();
-      final jsonString = const JsonEncoder.withIndent('  ').convert({
-        'version': 1,
-        'lastSaved': DateTime.now().toIso8601String(),
-        ...state,
-      });
       await file.writeAsString(jsonString, flush: true);
       return true;
     } catch (e) {
@@ -52,6 +68,11 @@ class LocalStorageService {
   /// Loads the saved system state from disk, or returns null if not found.
   static Future<Map<String, dynamic>?> loadState() async {
     try {
+      await _pendingSave;
+      if (kIsWeb) {
+        final raw = await _webStorage.read(key: _fileName);
+        return raw == null ? null : Map<String, dynamic>.from(jsonDecode(raw));
+      }
       final file = await getStorageFile();
       if (!await file.exists()) return null;
       final content = await file.readAsString();
@@ -70,6 +91,8 @@ class LocalStorageService {
   /// Removes the local storage file from disk (e.g. for full database reset).
   static Future<bool> clearStorage() async {
     try {
+      await _pendingSave;
+      if (kIsWeb) { await _webStorage.delete(key: _fileName); return true; }
       final file = await getStorageFile();
       if (await file.exists()) {
         await file.delete();

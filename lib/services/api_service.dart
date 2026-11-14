@@ -6,6 +6,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class ApiService {
   ApiService._();
+  @visibleForTesting
+  static http.Client client = http.Client();
   static final ApiService instance = ApiService._();
 
   static const FlutterSecureStorage _storage = FlutterSecureStorage();
@@ -26,7 +28,7 @@ class ApiService {
           ? _envBaseUrl.substring(0, _envBaseUrl.length - 1)
           : _envBaseUrl;
     }
-    if (kIsWeb) return 'http://localhost:8001';
+    if (kIsWeb) return Uri.base.origin;
     try {
       if (Platform.isAndroid) return 'http://localhost:8001';
     } catch (_) {}
@@ -61,7 +63,8 @@ class ApiService {
   }
 
   /// Headers with Bearer token injection
-  static Future<Map<String, String>> _headers({Map<String, String>? extra}) async {
+  static Future<Map<String, String>> _headers(
+      {Map<String, String>? extra}) async {
     final token = await getAuthToken();
     final h = <String, String>{
       'Content-Type': 'application/json',
@@ -86,11 +89,13 @@ class ApiService {
       if (Platform.environment.containsKey('FLUTTER_TEST')) return false;
     } catch (_) {}
 
-    if (_hasCustomBaseUrl) {
+    if (_hasCustomBaseUrl || kIsWeb) {
       try {
-        final res = await http.get(
-          Uri.parse('$_baseUrl/api/health'),
-        ).timeout(const Duration(seconds: 3));
+        final res = await client
+            .get(
+              Uri.parse('$_baseUrl/api/health'),
+            )
+            .timeout(const Duration(seconds: 3));
         return res.statusCode == 200;
       } catch (_) {
         return false;
@@ -106,7 +111,7 @@ class ApiService {
 
     for (final candidate in candidates) {
       try {
-        final res = await http
+        final res = await client
             .get(Uri.parse('$candidate/api/health'))
             .timeout(const Duration(milliseconds: 1500));
         if (res.statusCode == 200) {
@@ -119,41 +124,50 @@ class ApiService {
   }
 
   /// HTTP GET
-  Future<dynamic> get(String endpoint, {Map<String, String>? queryParams}) async {
+  Future<dynamic> get(String endpoint,
+      {Map<String, String>? queryParams}) async {
     var uri = Uri.parse('$_baseUrl$endpoint');
     if (queryParams != null && queryParams.isNotEmpty) {
       uri = uri.replace(queryParameters: queryParams);
     }
-    final response = await http.get(uri, headers: await _headers()).timeout(const Duration(seconds: 10));
+    final response = await client
+        .get(uri, headers: await _headers())
+        .timeout(const Duration(seconds: 10));
     return _handleResponse(response);
   }
 
   /// HTTP POST
   Future<dynamic> post(String endpoint, {dynamic body}) async {
     final uri = Uri.parse('$_baseUrl$endpoint');
-    final response = await http.post(
-      uri,
-      headers: await _headers(),
-      body: body != null ? jsonEncode(body) : null,
-    ).timeout(const Duration(seconds: 12));
+    final response = await client
+        .post(
+          uri,
+          headers: await _headers(),
+          body: body != null ? jsonEncode(body) : null,
+        )
+        .timeout(const Duration(seconds: 12));
     return _handleResponse(response);
   }
 
   /// HTTP PUT
   Future<dynamic> put(String endpoint, {dynamic body}) async {
     final uri = Uri.parse('$_baseUrl$endpoint');
-    final response = await http.put(
-      uri,
-      headers: await _headers(),
-      body: body != null ? jsonEncode(body) : null,
-    ).timeout(const Duration(seconds: 10));
+    final response = await client
+        .put(
+          uri,
+          headers: await _headers(),
+          body: body != null ? jsonEncode(body) : null,
+        )
+        .timeout(const Duration(seconds: 10));
     return _handleResponse(response);
   }
 
   /// HTTP DELETE
   Future<dynamic> delete(String endpoint) async {
     final uri = Uri.parse('$_baseUrl$endpoint');
-    final response = await http.delete(uri, headers: await _headers()).timeout(const Duration(seconds: 10));
+    final response = await client
+        .delete(uri, headers: await _headers())
+        .timeout(const Duration(seconds: 10));
     return _handleResponse(response);
   }
 
@@ -186,4 +200,3 @@ class ApiException implements Exception {
   @override
   String toString() => message;
 }
-

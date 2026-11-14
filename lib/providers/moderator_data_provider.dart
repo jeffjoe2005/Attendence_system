@@ -12,6 +12,7 @@ import '../services/attendance_api_service.dart';
 /// Shared centralized data store for Moderator, Admin, Professor, CR, and Student portals.
 /// Supports 5 engineering branches: CSE, ECE, EEE, ME, CE.
 class ModeratorDataProvider extends ChangeNotifier {
+  final bool persistLocal;
   bool _isLoadingFromStorage = false;
   bool _isSeeding = false;
   bool _isBackendSyncEnabled = false;
@@ -23,6 +24,7 @@ class ModeratorDataProvider extends ChangeNotifier {
   }
 
   ModeratorDataProvider({
+    this.persistLocal = true,
     bool seedDefaults = true,
     bool loadFromStorageOnStart = true,
     bool enableBackendSync = false,
@@ -269,6 +271,66 @@ class ModeratorDataProvider extends ChangeNotifier {
     return _professors.any((p) => p['email']?.toLowerCase() == clean);
   }
 
+  /// Local prototype identity lookup. Ambiguous first names never select a faculty member.
+  String? resolveLocalProfessor(String email) {
+    final clean = email.trim().toLowerCase();
+    final username = clean.split('@').first;
+    if (RegExp(r'^\d{2}[a-z]{2,3}\d+$').hasMatch(username)) return null;
+    if (clean == 'hackathon1379@gmail.com') {
+      final matches = _professors.where((p) =>
+          (p['name'] ?? '').toLowerCase().contains('anirban')).toList();
+      return matches.length == 1 ? matches.single['email'] : null;
+    }
+    if (isProfessorEmail(clean)) return clean;
+    final matches = _professors.where((p) {
+      final words = (p['name'] ?? '').toLowerCase()
+          .replaceAll(RegExp(r'\b(dr|prof|professor|mr|mrs|ms)\b\.?'), '')
+          .trim().split(RegExp(r'[^a-z]+'));
+      return words.isNotEmpty && words.first.length > 2 &&
+          username.startsWith(words.first);
+    }).toList();
+    return matches.length == 1 ? matches.single['email'] : null;
+  }
+
+  Future<void> initializeLocalPrototype() async {
+    await loadFromStorage();
+    final match = _professors.where((p) =>
+        (p['name'] ?? '').toLowerCase().contains('anirban')).toList();
+    if (match.length == 1) {
+      match.single['email'] = 'hackathon1379@gmail.com';
+      notifyListeners();
+    }
+  }
+
+  Future<bool> flushLocalState() => LocalStorageService.saveState(toJson());
+
+  void registerLocalStudent(String email, String verifiedName) {
+    final roll = email.split('@').first.toUpperCase();
+    final match = RegExp(r'^\d{2}([A-Z]{2,3})\d+$').firstMatch(roll);
+    if (match == null || _students.any((s) => s['roll'] == roll)) return;
+    final branch = {'EC':'ECE', 'CS':'CSE', 'EE':'EEE', 'ME':'MCE', 'CE':'CVE'}[match[1]] ?? match[1]!;
+    _students.add({'roll': roll, 'email': email, 'name': verifiedName,
+      'branch': branch, 'semester': 'VI Sem'}); // Existing local prototype's default cohort.
+    notifyListeners();
+  }
+
+  void ensureLocalDemoRoster(Map<String, String> course) {
+    if (_students.any((s) => s['branch'] == course['branch'] && s['semester'] == course['semester'])) return;
+    const names = ['Aarav Deshmukh', 'Aditi Naik', 'Bhavesh Singh', 'Chinmay Patil', 'Diya Kamat', 'Harshit Vernekar'];
+    for (var i = 0; i < names.length; i++) {
+      _students.add({'roll': 'DEMO-${course['code']}-${i + 1}', 'name': names[i],
+        'branch': course['branch'] ?? '', 'semester': course['semester'] ?? '', 'email': '', 'demo': 'true'});
+    }
+    notifyListeners();
+  }
+
+  final Map<String, dynamic> localAttendanceTools = {};
+  Future<bool> saveLocalTool(String key, dynamic value) async {
+    localAttendanceTools[key] = value;
+    notifyListeners();
+    return flushLocalState();
+  }
+
   String? getProfessorNameByEmail(String email) {
     final clean = email.trim().toLowerCase();
     final found = _professors.where((p) => p['email']?.toLowerCase() == clean);
@@ -488,11 +550,11 @@ class ModeratorDataProvider extends ChangeNotifier {
       }
     }
 
-    final percentage = total > 0 ? (attended / total) * 100 : 85.0;
+    final percentage = total > 0 ? (attended / total) * 100 : 0.0;
     return {
-      'total': total > 0 ? total : 20,
-      'attended': total > 0 ? attended : 17,
-      'percentage': total > 0 ? percentage : 85.0,
+      'total': total,
+      'attended': attended,
+      'percentage': percentage,
     };
   }
 
@@ -1005,7 +1067,7 @@ class ModeratorDataProvider extends ChangeNotifier {
   }
 
   void _persist() {
-    LocalStorageService.saveState(toJson());
+    if (persistLocal) LocalStorageService.saveState(toJson());
   }
 
   Map<String, dynamic> toJson() {
@@ -1015,6 +1077,7 @@ class ModeratorDataProvider extends ChangeNotifier {
       'crs': _crs,
       'mappings': _mappings,
       'students': _students,
+      'localAttendanceTools': localAttendanceTools,
       'attendanceSessions': _attendanceSessions.map((s) {
         return {
           ...s,
@@ -1076,6 +1139,9 @@ class ModeratorDataProvider extends ChangeNotifier {
     }
 
     if (json['students'] is List) {
+      if (json['localAttendanceTools'] is Map) {
+        localAttendanceTools.addAll(Map<String, dynamic>.from(json['localAttendanceTools']));
+      }
       _students.clear();
       for (final st in json['students'] as List) {
         if (st is Map) {

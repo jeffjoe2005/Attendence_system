@@ -1,3 +1,5 @@
+> Integrated four-role portal: see [Implementation report and setup](../IMPLEMENTATION_REPORT.md) for migration, authentication configuration, tests and the manual workflow.
+
 # attendance_system
 
 A new Flutter project.

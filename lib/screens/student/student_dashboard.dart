@@ -246,7 +246,9 @@ class _StudentDashboardState extends State<StudentDashboard>
         }
       }
 
-      final total = sessions.length;
+      final total = sessions.where((s) =>
+          (s['presentRolls'] as Iterable? ?? []).contains(activeRoll) ||
+          (s['absentRolls'] as Iterable? ?? []).contains(activeRoll)).length;
       final double? pct = total > 0 ? (attended / total) * 100 : null;
       return _CourseAttendanceItem(
         code: code,

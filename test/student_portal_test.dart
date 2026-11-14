@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -9,7 +12,9 @@ import 'package:attendance_system/screens/student/student_dashboard.dart';
 import 'package:attendance_system/services/api_service.dart';
 
 void main() {
-  testWidgets('Student Portal shows registered courses, counts, percentages, and Red/Yellow/Green highlights without top summary or bars', (tester) async {
+  testWidgets(
+      'Student Portal shows registered courses, counts, percentages, and Red/Yellow/Green highlights without top summary or bars',
+      (tester) async {
     tester.view.physicalSize = const Size(1000, 1400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() => tester.view.resetPhysicalSize());
@@ -84,7 +89,9 @@ void main() {
     expect(find.text('—'), findsOneWidget);
   });
 
-  testWidgets('Student Portal threshold boundary check (Red <75%, Yellow 75-80%, Green >80%)', (tester) async {
+  testWidgets(
+      'Student Portal threshold boundary check (Red <75%, Yellow 75-80%, Green >80%)',
+      (tester) async {
     tester.view.physicalSize = const Size(1000, 1400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() => tester.view.resetPhysicalSize());
@@ -96,9 +103,12 @@ void main() {
 
     // Add 4 boundary test courses for CSE VI Sem (student 22CSE010 - Aarav Sharma)
     modData.addCourse('Course Red', 'CS101', branch: 'CSE', semester: 'VI Sem');
-    modData.addCourse('Course Yellow Low', 'CS102', branch: 'CSE', semester: 'VI Sem');
-    modData.addCourse('Course Yellow High', 'CS103', branch: 'CSE', semester: 'VI Sem');
-    modData.addCourse('Course Green', 'CS104', branch: 'CSE', semester: 'VI Sem');
+    modData.addCourse('Course Yellow Low', 'CS102',
+        branch: 'CSE', semester: 'VI Sem');
+    modData.addCourse('Course Yellow High', 'CS103',
+        branch: 'CSE', semester: 'VI Sem');
+    modData.addCourse('Course Green', 'CS104',
+        branch: 'CSE', semester: 'VI Sem');
 
     // CS101: 7/10 = 70.0% -> RED (< 75%)
     for (int i = 1; i <= 10; i++) {
@@ -155,7 +165,8 @@ void main() {
           ChangeNotifierProvider.value(value: modData),
           ChangeNotifierProvider(create: (_) => AuthProvider()),
         ],
-        child: const MaterialApp(home: StudentDashboard(studentRoll: '22CSE010')),
+        child:
+            const MaterialApp(home: StudentDashboard(studentRoll: '22CSE010')),
       ),
     );
     await tester.pumpAndSettle();
@@ -172,13 +183,19 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(tester.widget<Text>(find.text('70.0%')).style?.color, equals(const Color(0xFFB91C1C)));
-    expect(tester.widget<Text>(find.text('75.0%').first).style?.color, equals(const Color(0xFFA16207)));
-    expect(tester.widget<Text>(find.text('80.0%').first).style?.color, equals(const Color(0xFFA16207)));
-    expect(tester.widget<Text>(find.text('83.3%')).style?.color, equals(const Color(0xFF15803D)));
+    expect(tester.widget<Text>(find.text('70.0%')).style?.color,
+        equals(const Color(0xFFB91C1C)));
+    expect(tester.widget<Text>(find.text('75.0%').first).style?.color,
+        equals(const Color(0xFFA16207)));
+    expect(tester.widget<Text>(find.text('80.0%').first).style?.color,
+        equals(const Color(0xFFA16207)));
+    expect(tester.widget<Text>(find.text('83.3%')).style?.color,
+        equals(const Color(0xFF15803D)));
   });
 
-  testWidgets('Student Portal responsive mobile layout, search, and colour-band filter pills', (tester) async {
+  testWidgets(
+      'Student Portal responsive mobile layout, search, and colour-band filter pills',
+      (tester) async {
     tester.view.physicalSize = const Size(420, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() => tester.view.resetPhysicalSize());
@@ -214,8 +231,26 @@ void main() {
     expect(find.text('EC351'), findsNothing);
   });
 
-  testWidgets('AppRouter directs any @nitgoa.ac.in authenticated user directly to StudentDashboard', (tester) async {
+  testWidgets('AppRouter opens server-backed student view after authentication',
+      (tester) async {
     ApiService.testMode = true;
+    final oldClient = ApiService.client;
+    ApiService.client = MockClient((request) async => http.Response(
+        jsonEncode({
+          'user': {'id': 'student', 'role': 'student'},
+          'courses': [],
+          'enrolled_ids': [],
+          'managed_ids': [],
+          'users': [],
+          'permissions': [],
+          'sessions': [],
+          'stats': {}
+        }),
+        200));
+    addTearDown(() {
+      ApiService.client.close();
+      ApiService.client = oldClient;
+    });
     addTearDown(() => ApiService.testMode = false);
 
     final modData = ModeratorDataProvider(
@@ -223,6 +258,8 @@ void main() {
       loadFromStorageOnStart: false,
     );
     final auth = AuthProvider();
+    await tester.runAsync(() => ApiService.setAuthToken('test-fixture'));
+    await auth.initialize();
 
     await tester.pumpWidget(
       MultiProvider(
@@ -244,11 +281,12 @@ void main() {
       await auth.signInWithEmail('anyuser@nitgoa.ac.in', modData: modData);
     });
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pumpAndSettle();
 
     // Verified: Opens directly in StudentDashboard
     expect(find.byType(LoginScreen), findsNothing);
     expect(find.byType(StudentDashboard), findsOneWidget);
     expect(find.text('Registered Courses'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
   });
 }

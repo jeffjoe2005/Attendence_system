@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/auth_api_service.dart';
+import '../../providers/moderator_data_provider.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -13,7 +14,12 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   Future<void> _handleGoogleSignIn() async {
     final auth = context.read<AuthProvider>();
+    final localData = context.read<ModeratorDataProvider>();
     final success = await auth.signInWithGoogle();
+    if (success) {
+      await localData.loadFromStorage();
+      localData.registerLocalStudent(auth.userEmail, auth.userName);
+    }
     if (!success && mounted && auth.error != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

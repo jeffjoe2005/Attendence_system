@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase;
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/user_model.dart';
@@ -17,6 +18,7 @@ class AuthApiService {
       '592828977116-qnjuo9akgsg7lhb1jr5gf5msr49hmbo7.apps.googleusercontent.com';
 
   static const List<String> developerEmails = [
+    'hackathon1379@gmail.com', // Explicit temporary faculty login; no developer role.
     'sparshraul2@gmail.com',
   ];
 
@@ -56,6 +58,17 @@ class AuthApiService {
     }
 
     try {
+      if (kIsWeb) {
+        final provider = firebase.GoogleAuthProvider();
+        provider.setCustomParameters({'prompt': 'select_account'});
+        final credential =
+            await firebase.FirebaseAuth.instance.signInWithPopup(provider);
+        final token = await credential.user?.getIdToken();
+        if (token == null) {
+          throw Exception('Google did not return a verified identity');
+        }
+        return await _authenticateFirebaseToken(token);
+      }
       if (isWindows) {
         final firebaseIdToken = await _signInInSystemBrowser();
         return await _authenticateFirebaseToken(firebaseIdToken);
@@ -267,6 +280,7 @@ document.getElementById('signin').addEventListener('click',async()=>{
 
   /// Signs out from Google and clears stored JWT token
   Future<void> signOut() async {
+    if (kIsWeb) await firebase.FirebaseAuth.instance.signOut();
     try {
       await _googleSignIn.signOut();
     } catch (_) {}
